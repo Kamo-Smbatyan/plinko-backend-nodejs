@@ -11,8 +11,6 @@ const gameRoutes = require("./routes/gameRoutes");
 const { socketHandler } = require("./socket/socketHandler");
 const webHookRouter = require('./routes/webHookRouter');
 const transactionRouter = require('./routes/transactionRoutes');
-const {connection} = require('./utils/helper');
-const { PublicKey } = require("solana-web3.js");
 
 // const transactionRoutes = require("./routes/transactionRoutes");
 
