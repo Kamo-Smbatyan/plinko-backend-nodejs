@@ -7,7 +7,7 @@ const WEBHOOK_ID = require('../config/constants');
 const { JITO_TIP_ACCOUNTS, JITO_ENDPOINTS } = require('../config/constants');
 const {getWebHooks, createWebhook} = require('../config/webhook');
 dotenv.config();
-
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const connection = new Connection(process.env.SOLANA_RPC_URL);
 const adminWallet = Keypair.fromSecretKey(bs58.decode(process.env.ADMIN_WALLET_SECRETKEY));
 
@@ -157,6 +157,34 @@ const checkAndSetWebhookID = async () => {
     console.log("Webhook ID:", WEBHOOK_ID.getWebHookID());
 }
 
+
+async function getDecimal(mint) {
+    try {
+        const response = await axios.post(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`, {
+            jsonrpc: "2.0",
+            id: "test",
+            method: "getAsset",
+            params: {
+                id: mint
+            }
+        }, {
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+        
+        const decimals = response.data?.result?.token_info?.decimals;
+        console.log("Decimals:", decimals);
+        return decimals;
+    } catch (error) {
+        console.error("Error fetching decimals:", error);
+    }
+}
+
+const delay =  async (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 module.exports = {
     connection, 
     adminWallet,
@@ -169,4 +197,6 @@ module.exports = {
     sendBundleRequest,
     checkTransactionStatus,
     checkAndSetWebhookID,
+    delay,
+    getDecimal
 }

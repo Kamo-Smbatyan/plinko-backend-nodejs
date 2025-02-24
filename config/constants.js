@@ -32,9 +32,15 @@ const JITO_TIP_ACCOUNTS = [
     'DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh'
 ]
 
+const JUPITER_API_BASE_URL = {
+    QUOTE: 'https://api.jup.ag/swap/v1/quote/',
+    SWAP: 'https://api.jup.ag/swap/v1/swap/',
+}
+
 module.exports = {
     setWebHookID, 
     getWebHookID,
     JITO_ENDPOINTS,
-    JITO_TIP_ACCOUNTS
+    JITO_TIP_ACCOUNTS,
+    JUPITER_API_BASE_URL
 };

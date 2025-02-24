@@ -1,8 +1,7 @@
 const { LAMPORTS_PER_SOL, Keypair } = require("@solana/web3.js");
-const axios = require('axios');
 const User = require("../models/User");
 const {swapMintToStable, transferUSDC} = require('./transactionController');
-const {adminWallet, connection} = require('../utils/helper');
+const {adminWallet, getDecimal} = require('../utils/helper');
 const bs58 = require('bs58');
 const dotenv = require('dotenv');
 
@@ -10,42 +9,14 @@ dotenv.config();
 const SOL_MINT_ADDRESS='So11111111111111111111111111111111111111112';
 const USDC_MINT = process.env.USDC_MINT;
 
-
-const  HELIUS_API_KEY = process.env.HELIUS_API_KEY;
-
-
 async function handleWebhook(req, res){
     const txData = req.body;
-    console.log('Received transaction:', JSON.stringify(txData, null, 2));
+    console.log('Transaction Received by Webhook:', txData);
     if (txData.length > 0){
         await parseTransferTx(txData); 
     }
     res.status(200).send('Webhook received successfully');
 }
-
-async function getDecimal(mint) {
-    try {
-        const response = await axios.post(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`, {
-            jsonrpc: "2.0",
-            id: "test",
-            method: "getAsset",
-            params: {
-                id: mint
-            }
-        }, {
-            headers: {
-                "Content-Type": "application/json"
-            }
-        });
-        
-        const decimals = response.data?.result?.token_info?.decimals;
-        console.log("Decimals:", decimals);
-        return decimals;
-    } catch (error) {
-        console.error("Error fetching decimals:");
-    }
-}
-
 
 const parseTransferTx = async (txDatas) => {
     for(const txData of txDatas){
@@ -77,7 +48,7 @@ const parseTransferTx = async (txDatas) => {
                 console.log('Token Amount to know the token Decimal', amount);
 
                 if (tokenMint == USDC_MINT){   
-                    const transferResult = await transferUSDC(userWallet, adminWallet.publicKey.toBase58(), Math.floor(amount));
+                    const transferResult = await transferUSDC(userWallet, adminWallet.publicKey.toBase58(), Math.floor(amount), USDC_MINT);
                     
                     if (!transferResult){
                         console.log('Transfer failed');
@@ -107,7 +78,7 @@ const parseTransferTx = async (txDatas) => {
             
         } else if (txData.nativeTransfers.length > 0){
             for (const nativeTransfer of txData.nativeTransfers){
-
+                
                 receiver = nativeTransfer.toUserAccount;
                 amount = nativeTransfer.amount;
                 if (amount<50000){
