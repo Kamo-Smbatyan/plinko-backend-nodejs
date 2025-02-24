@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const dotenv = require('dotenv');
+
 dotenv.config();
 const WEBHOOK_ID = require('./constants')
 
@@ -9,15 +10,13 @@ const WEBHOOK_TYPE = process.env.WEBHOOK_TYPE;
 
 const getAllWalletAddresses = async () => {
   try {
-    const users = await User.find({}, 'walletAddress'); // Fetch only the walletAddress field
-    return users.map(user => user.walletAddress); // Extract as an array
+    const users = await User.find({}, 'walletAddress');
+    return users.map(user => user.walletAddress);
   } catch (error) {
     console.error("Error fetching wallet addresses:", error);
     return [];
   }
 };
-
-
 
 const getWebHooks = async () => {
   try {
@@ -48,7 +47,6 @@ const getWebHooks = async () => {
 
 const createWebhook = async () => {
   try {
-
     const walletArray = await getAllWalletAddresses();
     console.log('Wallet Array', walletArray);
     const response = await fetch(
@@ -98,6 +96,9 @@ const deleteWebhook = async (webHookID) => {
 const editWebhook = async (webhookID) => {
   try {
     const walletArray = await getAllWalletAddresses();
+    if(walletArray.length === 0) {
+      return;
+    }
     const response = await fetch(
       `https://api.helius.xyz/v0/webhooks/${webhookID}?api-key=${HELIUS_API_KEY}`,
       {
