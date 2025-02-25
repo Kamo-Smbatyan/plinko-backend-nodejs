@@ -4,15 +4,26 @@ const {clients} = require('../config/constants');
 const {createWebhookAdmin} = require('../config/webhook');
 
 router.get("/events", async (req, res) => {
-    const {telegramID} = req.query;
+    const { telegramID } = req.query;
+
+    if (!telegramID) {
+        res.status(400).json({ error: "Missing telegramID" });
+        return;
+    }
+    console.log('Event Telegram ID:::::::::', telegramID)
+
     res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*'
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*"
     });
+
+    // Store client response
     clients[telegramID] = res;
-    req.on('close', () => {
+
+    // Handle disconnection
+    req.on("close", () => {
         delete clients[telegramID];
     });
 });
