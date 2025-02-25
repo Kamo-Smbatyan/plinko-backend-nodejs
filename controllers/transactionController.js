@@ -198,6 +198,7 @@ async function tokenSwap(inputMint, swapAmount, user){
             throw new Error('Failed to get swap instructions:');
         }
 
+        const latestBlockhash = connection.getLatestBlockhash();
         const swapData = swapResponse.data;
         
         const message = deserializeTransaction(swapData.swapTransaction);
@@ -210,7 +211,7 @@ async function tokenSwap(inputMint, swapAmount, user){
         const swapTransactionSignature = versionedTrasnactionSwap.signatures[0];
         const serializedSwapTransaction = bs58.encode(transactionBinary);
         
-        const transactionHistory = await TransactionHistory.insertOne({
+        const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: swapTransactionSignature,
             mintAddress: USDC_MINT,
@@ -218,14 +219,14 @@ async function tokenSwap(inputMint, swapAmount, user){
             tx_state: 1,
             inAmount: swapAmount/LAMPORTS_PER_SOL,
             outAmount: outAmount,
-            created_at: Date.now().toLocaleString(),
-            updated_at: Date.now().toLocaleString()
+            created_at: Date.now(),
+            updated_at: Date.now()
         });
 
         await transactionHistory.save();
         let transactionStatus;
         let isSent = false;
-        let reply = 0
+        let retry = 0
         while(!isSent) {
             retry ++;
             console.log(`Swap transaction pending...${retry}`);
@@ -240,6 +241,10 @@ async function tokenSwap(inputMint, swapAmount, user){
                 transactionStatus = 'Sent';
                 break;
             }
+        }
+
+        if(!isSent){
+            return;
         }
 
         console.log('Swap transaction sent.')
@@ -261,7 +266,8 @@ async function tokenSwap(inputMint, swapAmount, user){
             tx_id: swapTransactionSignature, 
             outAmount,
             transactionStatus,
-            transactionHistory
+            transactionHistory,
+            isConfirmed,
         };
     } catch(err) {
         console.log(err)
@@ -301,7 +307,7 @@ async function solSwap (swapAmount) {
         const message = deserializeTransaction(swapData.swapTransaction);
         const accountKeysFromLookups = await resolveAddressLookups(message);
         const swapInstructions = await createTransactionInstructions(message, accountKeysFromLookups);
-
+        const latestBlockhash = connection.getLatestBlockhash();
         const versionedTrasnactionSwap = await createVersionedTransaction([ adminWallet ], swapInstructions, latestBlockhash);
         versionedTrasnactionSwap.sign([adminWallet]);
         const transactionBinary = versionedTrasnactionSwap.serialize()
@@ -323,7 +329,8 @@ async function solSwap (swapAmount) {
 
         return { 
             tx_id: swapTransactionSignature, 
-            outAmount
+            outAmount: outAmount,
+            isConfirmed: isConfirmed,
         };
     } catch(err) {
         console.log(err);

@@ -2,7 +2,7 @@ const { LAMPORTS_PER_SOL, Keypair } = require("@solana/web3.js");
 const User = require("../models/User");
 const TransactionHistory = require('../models/TransactionHistory');
 const {tokenTransferToAdmin, tokenSwap} = require('./transactionController');
-const {adminWallet, getDecimal, sendSignalToFrontend} = require('../utils/helper');
+const {adminWallet, connection, getDecimal, sendSignalToFrontend} = require('../utils/helper');
 const bs58 = require('bs58');
 const dotenv = require('dotenv');
 const {clients} = require('../config/constants');
@@ -152,15 +152,28 @@ const parseUserTx = async (txData) => {
 
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
         await user.save();
-        transactionHistory.updated_at = Date.now().toLocaleString();
+        transactionHistory.updated_at = Date.now();
         transactionHistory.tx_state = 3;
         await transactionHistory.save();
 
-        await sendSignalToFrontend(`user.telegramID,  transfer_confirmed_${user.balanceStableCoin}`);
+        await sendSignalToFrontend(user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
         console.log('Transfer successed', transferResult.transferSignature);
-        
-        await tokenSwap(NATIVE_MINT, amount , user);
-        return;
+        const swapResult = await tokenSwap(NATIVE_MINT, amount , user); ///send swap transaction
+        const swapTransactionHis = swapResult.transactionHistory;
+        if (!swapTransactionHis){
+            console.log("Swap failed");
+            return;
+        }
+        if (swapResult.isConfirmed){
+            swapTransactionHis.tx_state = 3;
+            swapTransactionHis.updated_at = Date.now();
+            console.log('Swapped successfully')
+        }
+        else{
+            swapTransactionHis.tx_state = 3;
+            swapTransactionHis.updated_at = Date.now();
+            console.log('Swap transaction sent, but not confirmed');
+        }
     }
 }
 
@@ -243,12 +256,12 @@ const parseAdminTx = async (txData) => {
         }
         if(swapedAmount <= 0) {
             console.log('Invalid amount');
-            transactionDatabase.updated_at = Date.now().toLocaleString();
+            transactionDatabase.updated_at = Date.now();
             transactionDatabase.tx_state = 3;
             return;
         }
 
-        transactionDatabase.updated_at = Date.now().toLocaleString();
+        transactionDatabase.updated_at = Date.now();
         transactionDatabase.tx_state = 3;
 
         user.balanceStableCoin += swapedAmount;
