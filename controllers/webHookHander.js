@@ -86,7 +86,7 @@ const parseUserTx = async (txData) => {
         await sendSignalToFrontend( user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
 
         console.log('Transfer successed', transferResult.transferSignature);
-
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // await tokenSwap()
 
     } else if (txData.nativeTransfers.length > 0){
@@ -112,7 +112,7 @@ const parseUserTx = async (txData) => {
     
         if(!transferResult){
             console.log('Transfer Failed');
-            sendSignalToFrontend('transfer_failed');
+            await sendSignalToFrontend(user.telegramID, 'transfer_failed');
             return;
         }
 
@@ -142,7 +142,7 @@ const parseUserTx = async (txData) => {
         await user.save();
 
         if(transferResult.outAmount == null){
-            sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
+            await sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
             console.log('Amount is zero, Transfer Failed');
             return;
         }
@@ -153,8 +153,10 @@ const parseUserTx = async (txData) => {
         transactionHistory.tx_state = 3;
         await transactionHistory.save();
 
-        sendSignalToFrontend(`user.telegramID,  transfer_confirmed_${user.balanceStableCoin}`);
+        await sendSignalToFrontend(`user.telegramID,  transfer_confirmed_${user.balanceStableCoin}`);
         console.log('Transfer successed', transferResult.transferSignature);
+        
+        await parseAdminTx(txData);
         return;
     }
 }
@@ -171,8 +173,8 @@ const parseAdminTx = async (txData) => {
 
     if(txData.tokenTransfers.length > 0){
         const tokenTransfer = txData.tokenTransfers[0];
-        const senderWalletAddress = tokenTransfer.fromUserAccount;
-        const user = await User.findOne({walletAddress: senderWalletAddress});
+        const receiver = tokenTransfer.fromUserAccount;
+        const user = await User.findOne({walletAddress: receiver});
         
         if(!user){
             return;
