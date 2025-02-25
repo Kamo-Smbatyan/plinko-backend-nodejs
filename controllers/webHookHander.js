@@ -14,7 +14,7 @@ const USDC_MINT = process.env.USDC_MINT;
 
 async function handleWebhook(req, res){
     const txData = req.body;
-    console.log('Admin Transaction Received by Webhook:', txData);
+    // console.log('Admin Transaction Received by Webhook:', txData);
     if (txData.length > 0){
         await parseUserTx(txData[0]); 
     }
@@ -22,7 +22,7 @@ async function handleWebhook(req, res){
 
 async function handleAdminWebhook(req, res){
     const txData = req.body;
-    console.log('Admin wallet transaction detected by webhook', txData);
+    // console.log('Admin wallet transaction detected by webhook', txData);
     if (txData.length > 0){
         await parseAdminTx(txData[0]);
     }
