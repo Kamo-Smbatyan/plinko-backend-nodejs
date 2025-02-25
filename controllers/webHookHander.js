@@ -52,7 +52,7 @@ const parseUserTx = async (txData) => {
 
         const transferResult = await tokenTransferToAdmin(tokenMint, amount, user);
 
-        console.log('TRANSFER SWAP RESULT', transferResult);
+        console.log('TRANSFER TRANSACTION RESULT', transferResult);
 
         if(!transferResult){
             console.log('Transfer Failed');
@@ -60,9 +60,9 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        TransactionHistory.insertOne({
+        await TransactionHistory.insertOne({
             telegramID: user.telegramID,
-            signature: transferResult.transferSignature,
+            signature: transferResult.transferSignature.toString(),
             tx_type : 1,
             tx_state: 1,
             inAmount: amount,
@@ -70,8 +70,8 @@ const parseUserTx = async (txData) => {
             tx_type:  1, 
             tx_state: 1,
             outAmount: transferResult.outAmount,
-            created_at: Date.now().toLocaleString(),
-            updated_at: Date.now().toLocaleString()
+            created_at: Date.now(),
+            updated_at: Date.now()
         });
 
         if(transferResult.outAmount == null){
@@ -120,9 +120,9 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        const transactionHistory = TransactionHistory.insertOne({
+        const transactionHistory = await TransactionHistory.insertOne({
             telegramID: user.telegramID,
-            signature: transferResult.transferSignature,
+            signature: transferResult.transferSignature.toString(),
             tx_type : 1,
             tx_state: 1,
             inAmount: amount,
@@ -130,8 +130,8 @@ const parseUserTx = async (txData) => {
             tx_type:  1, 
             tx_state: 1,
             outAmount: transferResult.outAmount,
-            created_at: Date.now().toLocaleString(),
-            updated_at: Date.now().toLocaleString()
+            created_at: Date.now(),
+            updated_at: Date.now()
         });
 
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
