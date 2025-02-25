@@ -16,7 +16,7 @@ const USDC_MINT=process.env.USDC_MINT;
 
 const tokenTransferToAdmin = async (inputMint, amount, user) => {
     try {
-        
+
         const secretKey = user.secretKey;
         const userWallet = Keypair.fromSecretKey(bs58.decode(secretKey));
         const instructions = [];
@@ -94,7 +94,7 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
         
         let outAmount = null;
         try{
-            const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
+            const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT}&amount=${Math.floor(tokenBalance)}&slippageBps=30`);
             const quoteResponseData = quoteResponse.data; 
             outAmount = quoteResponseData.outAmount;
             return {transferSignature, outAmount}
