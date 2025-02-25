@@ -14,7 +14,7 @@ const USDC_MINT = process.env.USDC_MINT;
 
 async function handleWebhook(req, res){
     const txData = req.body;
-    console.log('Admin Transaction Received by Webhook:');
+    console.log('Admin Transaction Received by Webhook:', txData);
     if (txData.length > 0){
         await parseUserTx(txData[0]); 
     }
@@ -155,6 +155,7 @@ const parseUserTx = async (txData) => {
 
         sendSignalToFrontend(`user.telegramID,  transfer_confirmed_${user.balanceStableCoin}`);
         console.log('Transfer successed', transferResult.transferSignature);
+        return;
     }
 }
 
@@ -164,6 +165,7 @@ const parseAdminTx = async (txData) => {
     }
 
     if (txData.transactionError != null ){
+        console.log("Transaction errors")
         return;
     }
 
