@@ -23,7 +23,7 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
         let tokenBalance = 0;
         let associatedTokenAccountForAdmin, associatedTokenAccountForUser ;
         
-        if(inputMint == SOL_MINT_ADDRESS){
+        if(inputMint === SOL_MINT_ADDRESS){
             let userBalance = await connection.getBalance(new PublicKey(user.walletAddress));
             console.log(`Sol Balance ${amount / LAMPORTS_PER_SOL} ${userWallet.publicKey.toBase58()}`);
             sendSignalToFrontend(user.telegramID, 'data: ' + 'sol' + '\n\n');
@@ -79,18 +79,19 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
 
         const transferSignature = await connection.sendRawTransaction(versionedTransaction.serialize(), [adminWallet, userWallet]);
 
-        const transactionDatabase = await TransactionHistory.insertOne({
-            telegramID: user.telegramID,
-            signature: transferSignature,
-            mintAddress: inputMint,
-            inAmount: amount,
-            tx_type: 1,
-            tx_state: 1,
-            create_at: Date.now(),
-            updated_at: Date.now()
-        });
-        await transactionDatabase.save();
-        sendSignalToFrontend(user.telegramID, 'completed');
+        // const transactionDatabase = await TransactionHistory.insertOne({
+        //     telegramID: user.telegramID,
+        //     signature: transferSignature,
+        //     mintAddress: inputMint,
+        //     inAmount: amount,
+        //     tx_type: 1,
+        //     tx_state: 1,
+        //     create_at: Date.now(),
+        //     updated_at: Date.now()
+        // });
+        // console.log('Saving Database');
+
+        // await transactionDatabase.save();
         
         let outAmount = null;
         try{
@@ -100,7 +101,7 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
             return {transferSignature, outAmount}
         } catch (err){
             console.log(err);
-            return {transferSignature, outAmount, transactionDatabase};
+            return {transferSignature, outAmount};
         }
 
     } catch(err) {

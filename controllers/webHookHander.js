@@ -49,31 +49,34 @@ const parseUserTx = async (txData) => {
         await sendSignalToFrontend(user.telegramID, 'hook');
         const tokenMint = tokenTransfer.mint;
         const amount = tokenTransfer.tokenAmount;
-            
-        console.log(`The ${tokenMint} token deposit ${amount} from ${receiver}`);
 
         const transferResult = await tokenTransferToAdmin(tokenMint, amount, user);
+
+        console.log('TRANSFER SWAP RESULT', transferResult);
+
         if(!transferResult){
             console.log('Transfer Failed');
               await sendSignalToFrontend(user.telegramID, 'transfer_failed');
             return;
         }
-        let transactionDatabase;
 
-        if (!transferResult.transactionDatabase){
-            await sendSignalToFrontend(user.telegramID, 'transfer_failed_database_error');
-            console.log('Database Error');
-            return;
-        }
-
+        TransactionHistory.insertOne({
+            telegramID: telegramID,
+            signature: transferResult.transferSignature,
+            tx_type : 1,
+            tx_state: 1,
+            inAmount: amount,
+            mintAddress: tokenMint,
+            tx_type:  1, 
+            tx_state: 1,
+            outAmount: transferResult.outAmount,
+            created_at: Date.now().toLocaleString(),
+            updated_at: Date.now().toLocaleString()
+        });
+        
         if(transferResult.outAmount == null){
             sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
             console.log('Amount is zero, Transfer Failed');
-            transactionDatabase = transferResult.transactionDatabase;
-            transactionDatabase.updated_at = Date.now();
-            transactionDatabase.tx_state = 2;
-            await transactionDatabase.save();// .save();
-            return;
         }
 
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
@@ -171,7 +174,7 @@ const parseAdminTx = async (txData) => {
             console.log('Swap failed');
             return;
         }
-
+        
         const swapedAmount = swapResult.outAmount / (10**6) * 0.975 - 1;
 
         if(swapedAmount <= 0) {
