@@ -205,8 +205,8 @@ async function tokenSwap(inputMint, swapAmount, user){
         const accountKeysFromLookups = await resolveAddressLookups(message);
         const swapInstructions = await createTransactionInstructions(message, accountKeysFromLookups);
 
-        const versionedTrasnactionSwap = await createVersionedTransaction([ adminWallet ], swapInstructions, latestBlockhash);
-        versionedTrasnactionSwap.sign([adminWallet]);
+        const versionedTrasnactionSwap = await createVersionedTransaction([adminWallet], swapInstructions, latestBlockhash);
+        // versionedTrasnactionSwap.sign([adminWallet]);
         const transactionBinary = versionedTrasnactionSwap.serialize()
         const swapTransactionSignature = versionedTrasnactionSwap.signatures[0];
         const serializedSwapTransaction = bs58.encode(transactionBinary);

@@ -55,7 +55,7 @@ const createTransactionInstructions = (message, accountKeysFromLookups) => {
 
 const createVersionedTransaction = async (payer, instructions, latestBlockhash) => {
     try {
-        console.log('PAYER,', payer, instructions, latestBlockhash);
+        console.log('PAYER:', payer, instructions, latestBlockhash);
         const message = new TransactionMessage({
             payerKey: payer[0].publicKey,
             recentBlockhash: latestBlockhash.blockhash,
