@@ -6,6 +6,7 @@ const {adminWallet, getDecimal, sendSignalToFrontend} = require('../utils/helper
 const bs58 = require('bs58');
 const dotenv = require('dotenv');
 const {clients} = require('../config/constants');
+const { NATIVE_MINT } = require("@solana/spl-token");
 
 
 dotenv.config();
@@ -23,9 +24,9 @@ async function handleWebhook(req, res){
 async function handleAdminWebhook(req, res){
     const txData = req.body;
     // console.log('Admin wallet transaction detected by webhook', txData);
-    if (txData.length > 0){
-        await parseAdminTx(txData[0]);
-    }
+    // if (txData.length > 0){
+    //     await parseAdminTx(txData[0]);
+    // }
 }
 
 const parseUserTx = async (txData) => {
@@ -40,6 +41,7 @@ const parseUserTx = async (txData) => {
     if(txData.tokenTransfers.length > 0){
         const tokenTransfer = txData.tokenTransfers[0];
         const receiver = tokenTransfer.toUserAccount;
+
         
         const user = await User.findOne({ walletAddress: receiver });
         if (!user){
@@ -49,8 +51,9 @@ const parseUserTx = async (txData) => {
         await sendSignalToFrontend(user.telegramID, 'hook');
         const tokenMint = tokenTransfer.mint;
         const amount = tokenTransfer.tokenAmount;
+        const decimals = await getDecimal(tokenMint);
 
-        const transferResult = await tokenTransferToAdmin(tokenMint, amount, user);
+        const transferResult = await tokenTransferToAdmin(tokenMint, amount, user);// token transfer
 
         console.log('TRANSFER TRANSACTION RESULT', transferResult);
 
@@ -58,7 +61,7 @@ const parseUserTx = async (txData) => {
             console.log('Transfer Failed');
               await sendSignalToFrontend(user.telegramID, 'transfer_failed');
             return;
-        }
+        }        
 
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
@@ -86,8 +89,8 @@ const parseUserTx = async (txData) => {
         await sendSignalToFrontend( user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
 
         console.log('Transfer successed', transferResult.transferSignature);
-        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // await tokenSwap()
+
+        await tokenSwap(tokenMint, amount * (10**decimals), user);
 
     } else if (txData.nativeTransfers.length > 0){
         const nativeTransfer = txData.nativeTransfers[0];
@@ -156,10 +159,9 @@ const parseUserTx = async (txData) => {
         await sendSignalToFrontend(`user.telegramID,  transfer_confirmed_${user.balanceStableCoin}`);
         console.log('Transfer successed', transferResult.transferSignature);
         
-        
+        await tokenSwap(NATIVE_MINT, amount , user);
         return;
     }
-    await parseAdminTx(txData);
 }
 
 const parseAdminTx = async (txData) => {

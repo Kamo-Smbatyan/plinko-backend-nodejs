@@ -158,12 +158,18 @@ async function transferUSDC(sender, receiver, amount, mint){
 async function tokenSwap(inputMint, swapAmount, user){
     try{
         let adminWalletTokenBalance = 0;
+        const associatedTokenAccountForAdmin = getAssociatedTokenAddressSync(inputMint, adminWallet.publicKey);
         while(adminWalletTokenBalance === 0){
             try {
                 adminWalletTokenBalance = await getTokenBalance(associatedTokenAccountForAdmin);
-            } catch(err) {}
-            
-            if(adminWalletTokenBalance === 0) await delay(1000);
+            } catch(err) {
+                console.log("Error occurred in get tokenBalance")
+            }
+            if(adminWalletTokenBalance === 0) {
+                await delay(2000);
+                continue;
+            }
+            else{ break; }
         }
         
         console.log('Swapping', amount);
