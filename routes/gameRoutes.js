@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {clients} = require('../config/constants');
-const {createWebhookAdmin} = require('../config/webhook');
+// const {createWebhookAdmin} = require('../config/webhook');
 
 router.get("/events", async (req, res) => {
     const { telegramID } = req.query;
@@ -21,7 +21,7 @@ router.get("/events", async (req, res) => {
 
     // Store client response
     clients[telegramID] = res;
-
+    clients[telegramID].write('data: '+"test"+'\n\n')
     // Handle disconnection
     req.on("close", () => {
         delete clients[telegramID];

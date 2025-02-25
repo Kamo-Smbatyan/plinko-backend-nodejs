@@ -14,7 +14,7 @@ const USDC_MINT = process.env.USDC_MINT;
 
 async function handleWebhook(req, res){
     const txData = req.body;
-    console.log('Admin Transaction Received by Webhook:', txData);
+    console.log('Admin Transaction Received by Webhook:');
     if (txData.length > 0){
         await parseUserTx(txData[0]); 
     }
@@ -22,7 +22,7 @@ async function handleWebhook(req, res){
 
 async function handleAdminWebhook(req, res){
     const txData = req.body;
-    console.log('Admin wallet transaction detected by webhook:', txData);
+    console.log('Admin wallet transaction detected by webhook');
     if (txData.length > 0){
         await parseAdminTx(txData[0]);
     }
@@ -46,7 +46,7 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        sendSignalToFrontend(user.telegramID, 'hook');
+        await sendSignalToFrontend(user.telegramID, 'hook');
         const tokenMint = tokenTransfer.mint;
         const amount = tokenTransfer.tokenAmount;
             
@@ -55,13 +55,13 @@ const parseUserTx = async (txData) => {
         const transferResult = await tokenTransferToAdmin(tokenMint, amount, user);
         if(!transferResult){
             console.log('Transfer Failed');
-            sendSignalToFrontend(user.telegramID, 'transfer_failed');
+              await sendSignalToFrontend(user.telegramID, 'transfer_failed');
             return;
         }
         let transactionDatabase;
 
         if (!transferResult.transactionDatabase){
-            sendSignalToFrontend(user.telegramID, 'transfer_failed_database_error');
+            await sendSignalToFrontend(user.telegramID, 'transfer_failed_database_error');
             console.log('Database Error');
             return;
         }
@@ -79,7 +79,7 @@ const parseUserTx = async (txData) => {
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
         await user.save();
 
-        sendSignalToFrontend( user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
+        await sendSignalToFrontend( user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
 
         console.log('Transfer successed', transferResult.transferSignature);
 
@@ -100,7 +100,7 @@ const parseUserTx = async (txData) => {
             return;
         }
            
-        sendSignalToFrontend(user.telegramID, 'hook');
+        await sendSignalToFrontend(user.telegramID, 'hook');
     
         const transferResult = await tokenTransferToAdmin(SOL_MINT_ADDRESS, amount, user);
     

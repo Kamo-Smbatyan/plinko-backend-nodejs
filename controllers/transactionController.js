@@ -14,15 +14,16 @@ dotenv.config();
 const SOL_MINT_ADDRESS='So11111111111111111111111111111111111111112';
 const USDC_MINT=process.env.USDC_MINT;
 
-const tokenTransferToAdmin = async (mint, amount, user) => {
+const tokenTransferToAdmin = async (inputMint, amount, user) => {
     try {
+        
         const secretKey = user.secretKey;
         const userWallet = Keypair.fromSecretKey(bs58.decode(secretKey));
         const instructions = [];
         let tokenBalance = 0;
         let associatedTokenAccountForAdmin, associatedTokenAccountForUser ;
         
-        if(mint == SOL_MINT_ADDRESS){
+        if(inputMint == SOL_MINT_ADDRESS){
             let userBalance = await connection.getBalance(new PublicKey(user.walletAddress));
             console.log(`Sol Balance ${amount / LAMPORTS_PER_SOL} ${userWallet.publicKey.toBase58()}`);
             sendSignalToFrontend(user.telegramID, 'data: ' + 'sol' + '\n\n');
@@ -52,13 +53,13 @@ const tokenTransferToAdmin = async (mint, amount, user) => {
             console.log(`${amount} token to ${userWallet.publicKey.toBase58()}`);
             sendSignalToFrontend(user.telegramID, 'data: ' + `token_${amount}` + '\n\n');
             [ associatedTokenAccountForAdmin, associatedTokenAccountForUser ] = await Promise.all([
-                getAssociatedTokenAddressSync(new PublicKey(mint), adminWallet.publicKey),
-                getAssociatedTokenAddressSync(new PublicKey(mint), userWallet.publicKey),
+                getAssociatedTokenAddressSync(new PublicKey(inputMint), adminWallet.publicKey),
+                getAssociatedTokenAddressSync(new PublicKey(inputMint), userWallet.publicKey),
             ]);
             const checkATAExists = await checkTokenAccountExistence(associatedTokenAccountForAdmin);
 
             if(!(checkATAExists)) {
-                instructions.push(createAssociatedTokenAccountInstruction(adminWallet.publicKey, associatedTokenAccountForAdmin, adminWallet.publicKey, new PublicKey(mint)));
+                instructions.push(createAssociatedTokenAccountInstruction(adminWallet.publicKey, associatedTokenAccountForAdmin, adminWallet.publicKey, new PublicKey(inputMint)));
             }
 
             while(tokenBalance === 0) {
@@ -75,11 +76,13 @@ const tokenTransferToAdmin = async (mint, amount, user) => {
         const versionedTransaction = await createVersionedTransaction([adminWallet, userWallet], instructions, latestBlockhash);
         
         console.log('Forwarding asset to admin wallet...');
+
         const transferSignature = await connection.sendRawTransaction(versionedTransaction.serialize(), [adminWallet, userWallet]);
+
         const transactionDatabase = await TransactionHistory.insertOne({
             telegramID: user.telegramID,
             signature: transferSignature,
-            mintAddress: mint,
+            mintAddress: inputMint,
             inAmount: amount,
             tx_type: 1,
             tx_state: 1,
