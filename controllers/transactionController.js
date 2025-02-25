@@ -172,7 +172,7 @@ async function tokenSwap(inputMint, swapAmount, user){
             else{ break; }
         }
         
-        console.log('Swapping', amount);
+        console.log('Swapping', swapAmount, adminWalletTokenBalance);
         const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
 
         const quoteData = quoteResponse.data;
