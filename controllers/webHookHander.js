@@ -156,9 +156,10 @@ const parseUserTx = async (txData) => {
         await sendSignalToFrontend(`user.telegramID,  transfer_confirmed_${user.balanceStableCoin}`);
         console.log('Transfer successed', transferResult.transferSignature);
         
-        await parseAdminTx(txData);
+        
         return;
     }
+    await parseAdminTx(txData);
 }
 
 const parseAdminTx = async (txData) => {
