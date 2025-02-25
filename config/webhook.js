@@ -131,6 +131,7 @@ const editWebhookUser = async (webhookID) => {
         body: JSON.stringify({
           webhookURL:`${SERVER_URL}/monitor/webhook`,
           transactionTypes: ["ANY"],
+          txnStatus: 'success',
           accountAddresses: walletArray,
           webhookType: 'enhanced'
         }),
@@ -166,6 +167,7 @@ const editWebhookAdmin = async (webhookID) => {
         },
         body: JSON.stringify({
           webhookURL:`${SERVER_URL}/monitor/webhookAdmin`,
+          txnStatus: 'success',
           transactionTypes: ["ANY"],
           accountAddresses: walletArray,
           webhookType: 'enhanced'

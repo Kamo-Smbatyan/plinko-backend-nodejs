@@ -22,7 +22,7 @@ async function handleWebhook(req, res){
 
 async function handleAdminWebhook(req, res){
     const txData = req.body;
-    console.log('Admin wallet transaction detected by webhook');
+    console.log('Admin wallet transaction detected by webhook', txData);
     if (txData.length > 0){
         await parseAdminTx(txData[0]);
     }
@@ -87,6 +87,8 @@ const parseUserTx = async (txData) => {
 
         console.log('Transfer successed', transferResult.transferSignature);
 
+        // await tokenSwap()
+
     } else if (txData.nativeTransfers.length > 0){
         const nativeTransfer = txData.nativeTransfers[0];
         const receiver = nativeTransfer.toUserAccount;
@@ -113,7 +115,6 @@ const parseUserTx = async (txData) => {
             sendSignalToFrontend('transfer_failed');
             return;
         }
-        let transactionDatabase;
 
         if (!transferResult.transactionDatabase){
             sendSignalToFrontend(user.telegramID, 'transfer_failed_database_error');
@@ -174,9 +175,11 @@ const parseAdminTx = async (txData) => {
         if(!user){
             return;
         }
-        if(!tokenTransfer.toUserAccount || tokenTransfer.toUserAccount != adminWallet.publicKey.toBase58()){
+        if(tokenTransfer.toUserAccount != adminWallet.publicKey.toBase58()){
             return;
         }
+
+        console.log(`Swapping ${amount} of ${tokenMint} ...`);
 
         const tokenMint = tokenTransfer.mint;
         const amount = tokenTransfer.tokenAmount;

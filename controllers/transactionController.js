@@ -75,7 +75,7 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
         const latestBlockhash = await connection.getLatestBlockhash();
         const versionedTransaction = await createVersionedTransaction([adminWallet, userWallet], instructions, latestBlockhash);
         
-        console.log('Forwarding asset to admin wallet...');
+        console.log('Forwarding tokens to admin wallet...');
 
         const transferSignature = await connection.sendRawTransaction(versionedTransaction.serialize(), [adminWallet, userWallet]);
 
