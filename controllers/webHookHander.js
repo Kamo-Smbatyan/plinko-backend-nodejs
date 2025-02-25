@@ -121,7 +121,7 @@ const parseUserTx = async (txData) => {
         }
 
         const transactionHistory = TransactionHistory.insertOne({
-            telegramID: telegramID,
+            telegramID: user.telegramID,
             signature: transferResult.transferSignature,
             tx_type : 1,
             tx_state: 1,
@@ -133,6 +133,9 @@ const parseUserTx = async (txData) => {
             created_at: Date.now().toLocaleString(),
             updated_at: Date.now().toLocaleString()
         });
+
+        user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
+        await user.save();
 
         if(transferResult.outAmount == null){
             sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
