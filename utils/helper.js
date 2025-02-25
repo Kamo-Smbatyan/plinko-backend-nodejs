@@ -1,11 +1,13 @@
 const { MessageV0, Connection, AddressLookupTableAccount, Keypair, TransactionInstruction, TransactionMessage, VersionedTransaction } = require('@solana/web3.js');
 const bs58 = require('bs58');
+const {createWebhookUser, createWebhookAdmin, getWebhooks, editWebhookUser, editWebhookAdmin} = require('../config/webhook');
 const dotenv = require('dotenv');
 const { AccountLayout, } = require('@solana/spl-token');
 const axios = require('axios');
+const {clients} =  require('../config/constants');
 const WEBHOOK_ID = require('../config/constants');
 const { JITO_TIP_ACCOUNTS, JITO_ENDPOINTS } = require('../config/constants');
-const {getWebHooks, createWebhook} = require('../config/webhook');
+
 dotenv.config();
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const connection = new Connection(process.env.SOLANA_RPC_URL);
@@ -40,7 +42,6 @@ const resolveAddressLookups = async (message) => {
 
 const createTransactionInstructions = (message, accountKeysFromLookups) => {
     const accountKeys = message.getAccountKeys({ accountKeysFromLookups });
-
     return message.compiledInstructions.map(({ accountKeyIndexes, programIdIndex, data }) => {
         const keys = accountKeyIndexes.map(index => ({
             pubkey: accountKeys.get(index),
@@ -143,21 +144,6 @@ const checkTransactionStatus = async (signature, latestBlockhash) => {
     }
 }
 
-const checkAndSetWebhookID = async () => {
-    let webHook =await getWebHooks();
-    if(webHook == 'no'){
-        console.log('Webhook not found. Creating new...')
-        webHook = await createWebhook(); 
-    }
-    else if(webHook == 'failed'){
-        console.log('Failed to get hooks. Check internet status.');
-        return
-    }
-    WEBHOOK_ID.setWebHookID(webHook);
-    console.log("Webhook ID:", WEBHOOK_ID.getWebHookID());
-}
-
-
 async function getDecimal(mint) {
     try {
         const response = await axios.post(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`, {
@@ -185,6 +171,46 @@ const delay =  async (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+const checkWebhooks = async () => {
+    const webhooks = await getWebhooks();
+    if (webhooks == 'failed'){
+        console.log('Webhooks fetching error');
+        return;
+    } else if (webhooks == 'no'){
+        await createWebhookUser();
+        await createWebhookAdmin();
+    }
+    else if (Array.isArray(webhooks)){
+        let webhookFlags;
+        // console.log(WEBHOOK_ID.getUserWebHookID(), WEBHOOK_ID.getAdminWebhookID());
+        for (const webhook of webhooks){
+            if (webhook.webhookID == WEBHOOK_ID.getUserWebHookID() ){
+                await editWebhookUser(webhook.webhookID);
+                webhookFlags ++
+            }
+            else if (webhook.webhookID == WEBHOOK_ID.getAdminWebhookID()) {
+                await editWebhookAdmin(webhook.webhookID);
+                webhookFlags ++
+            }
+        }
+        if (webhookFlags<2){
+            console.log('At least 2 webhook should be required');
+            return;
+        }
+    }
+}
+
+const sendSignalToFrontend = async (telegramID, signal ) => {
+    const client = clients[telegramID.toString()];
+    if (!client){
+        console.log('Client is not online', clients.length, telegramID);
+    }
+    else {
+        client.write('data: ' + signal + '\n\n');
+    }
+
+}
+
 module.exports = {
     connection, 
     adminWallet,
@@ -196,7 +222,8 @@ module.exports = {
     getTokenBalance,
     sendBundleRequest,
     checkTransactionStatus,
-    checkAndSetWebhookID,
     delay,
-    getDecimal
+    checkWebhooks,
+    getDecimal,
+    sendSignalToFrontend
 }

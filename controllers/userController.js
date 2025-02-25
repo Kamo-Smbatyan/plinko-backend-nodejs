@@ -1,4 +1,4 @@
-const { editWebhook, createWebhook } = require("../config/webhook");
+const { editWebhookUser, createWebhookUser } = require("../config/webhook");
 const WEBHOOK_ID = require('../config/constants');
 const {Keypair} = require('@solana/web3.js');
 const User = require("../models/User");
@@ -29,11 +29,11 @@ async function createUser(req,res){
       walletAddress: wallet.publicKey.toBase58(), 
       secretKey: bs58.encode(wallet.secretKey),
     });
-    if(WEBHOOK_ID.getWebHookID() == 'no'){
-       await createWebhook();
+    if(WEBHOOK_ID.getUserWebHookID() == 'no'){
+       await createWebhookUser();
     }
     else
-      await editWebhook(WEBHOOK_ID.getWebHookID());
+      await editWebhookUser(WEBHOOK_ID.getUserWebHookID());
     return res.json({
       walletAddress: wallet.publicKey.toBase58(),
     });

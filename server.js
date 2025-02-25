@@ -5,7 +5,7 @@ const http = require('http');
 const bodyParser = require("body-parser");
 const mongoose = require('./config/database');
 const {Server} = require('socket.io');
-const {checkAndSetWebhookID} = require('./utils/helper');
+const {checkWebhooks} = require('./utils/helper');
 const userRoutes = require("./routes/userRoutes");
 const gameRoutes = require("./routes/gameRoutes");
 const { socketHandler } = require("./socket/socketHandler");
@@ -32,7 +32,7 @@ app.use('/monitor', webHookRouter);
 app.use('/transaction', transactionRouter)
 
 main = async () =>{
-    await checkAndSetWebhookID();
+    await checkWebhooks();
 }
 main();
 const PORT = process.env.PORT || 5000;

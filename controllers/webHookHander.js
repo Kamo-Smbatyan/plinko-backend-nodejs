@@ -1,9 +1,12 @@
 const { LAMPORTS_PER_SOL, Keypair } = require("@solana/web3.js");
 const User = require("../models/User");
-const {swapMintToStable, transferUSDC} = require('./transactionController');
-const {adminWallet, getDecimal} = require('../utils/helper');
+const TransactionHistory = require('../models/TransactionHistory');
+const {tokenTransferToAdmin, tokenSwap} = require('./transactionController');
+const {adminWallet, getDecimal, sendSignalToFrontend} = require('../utils/helper');
 const bs58 = require('bs58');
 const dotenv = require('dotenv');
+const {clients} = require('../config/constants');
+
 
 dotenv.config();
 const SOL_MINT_ADDRESS='So11111111111111111111111111111111111111112';
@@ -11,101 +14,219 @@ const USDC_MINT = process.env.USDC_MINT;
 
 async function handleWebhook(req, res){
     const txData = req.body;
-    console.log('Transaction Received by Webhook:', txData);
+    console.log('Admin Transaction Received by Webhook:', txData);
     if (txData.length > 0){
-        await parseTransferTx(txData); 
+        await parseUserTx(txData[0]); 
     }
-    res.status(200).send('Webhook received successfully');
 }
 
-const parseTransferTx = async (txDatas) => {
-    for(const txData of txDatas){
-        if (!txData.type || txData.type !=='TRANSFER'){
-            continue;
+async function handleAdminWebhook(req, res){
+    const txData = req.body;
+    console.log('Admin wallet transaction detected by webhook:', txData);
+    if (txData.length > 0){
+        await parseAdminTx(txData[0]);
+    }
+}
+
+const parseUserTx = async (txData) => {
+    if (!txData.type || txData.type !=='TRANSFER'){
+        return;
+    }
+
+    if (txData.transactionError != null ){
+        return;
+    }
+
+    if(txData.tokenTransfers.length > 0){
+        const tokenTransfer = txData.tokenTransfers[0];
+        const receiver = tokenTransfer.toUserAccount;
+        
+        const user = await User.findOne({ walletAddress: receiver });
+        if (!user){
+            return;
         }
-        let receiver = null;
-        let amount = 0;
-        let tokenMint = null;
 
-        if(txData.tokenTransfers.length > 0){
-            if (txData.transactionError != null ){
-                return;
-            }
-            for (const tokenTransfer of txData.tokenTransfers){
-                receiver = tokenTransfer.toUserAccount;
-                console.log('Receiver:', receiver);
-                const user = await User.findOne({walletAddress: receiver});
-                if (!user){
-                    return;
-                }
-
-                const userWallet = Keypair.fromSecretKey(bs58.decode(user.secretKey));
-
-                tokenMint = tokenTransfer.mint;
-                const decimal = parseInt(await getDecimal(tokenMint));
-                amount = parseFloat(tokenTransfer.tokenAmount) * (10 ** (decimal == 1 ? decimal-1: decimal));
-                
-                console.log('Token Amount to know the token Decimal', amount);
-
-                if (tokenMint == USDC_MINT){   
-                    const transferResult = await transferUSDC(userWallet, adminWallet.publicKey.toBase58(), Math.floor(amount), USDC_MINT);
-                    
-                    if (!transferResult){
-                        console.log('Transfer failed');
-                        continue;
-                    }
-                    
-                    user.balanceStableCoin += parseFloat((amount-1) * 0.975);
-                    await user.save();
-                    console.log('User deposit with USDC');
-                    continue ;
-                }
-
-                const swapResult = await swapMintToStable(tokenMint, receiver, amount);
-                
-                if(!swapResult){
-                    console.log('Swap failed');
-                    continue;
-                }
-
-                const swapedAmount = swapResult.outAmount/(10**6);
-
-                user.balanceStableCoin += (swapedAmount *0.975 -1);
-
-                await user.save();
-                console.log('Deposit Completed', swapResult.tx_id);
-            }
+        sendSignalToFrontend(user.telegramID, 'hook');
+        const tokenMint = tokenTransfer.mint;
+        const amount = tokenTransfer.tokenAmount;
             
-        } else if (txData.nativeTransfers.length > 0){
-            for (const nativeTransfer of txData.nativeTransfers){
-                
-                receiver = nativeTransfer.toUserAccount;
-                amount = nativeTransfer.amount;
-                if (amount<50000){
-                    continue;
-                }
-                const user = await User.findOne({walletAddress: receiver});
-                
-                if (!user){
-                    console.log('User not found');
-                    return;
-                }
-        
-                const swapResult = await swapMintToStable(SOL_MINT_ADDRESS, receiver, amount);
-        
-                if(!swapResult){
-                    console.log( 'SWAP FAILED');
-                    return
-                }
+        console.log(`The ${tokenMint} token deposit ${amount} from ${receiver}`);
 
-                swapAmount = swapResult.outAmount/(10**6);
-                user.balanceStableCoin += parseFloat((swapAmount - 1) * 0.975);
-                await user.save();
-                console.log('Deposit SOL completed', swapResult.tx_id);
-            }
+        const transferResult = await tokenTransferToAdmin(tokenMint, amount, user);
+        if(!transferResult){
+            console.log('Transfer Failed');
+            sendSignalToFrontend(user.telegramID, 'transfer_failed');
+            return;
         }
+        let transactionDatabase;
+
+        if (!transferResult.transactionDatabase){
+            sendSignalToFrontend(user.telegramID, 'transfer_failed_database_error');
+            console.log('Database Error');
+            return;
+        }
+
+        if(transferResult.outAmount == null){
+            sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
+            console.log('Amount is zero, Transfer Failed');
+            transactionDatabase = transferResult.transactionDatabase;
+            transactionDatabase.updated_at = Date.now();
+            transactionDatabase.tx_state = 2;
+            await transactionDatabase.save();// .save();
+            return;
+        }
+
+        user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
+        await user.save();
+
+        sendSignalToFrontend( user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
+
+        console.log('Transfer successed', transferResult.transferSignature);
+
+    } else if (txData.nativeTransfers.length > 0){
+        const nativeTransfer = txData.nativeTransfers[0];
+        const receiver = nativeTransfer.toUserAccount;
+        const amount = nativeTransfer.amount;
+
+        if (amount < 50000){
+            console.log(`Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
+            return;
+        }
+
+        const user = await User.findOne({walletAddress: receiver});
+            
+        if (!user){
+            console.log('User not found');
+            return;
+        }
+           
+        sendSignalToFrontend(user.telegramID, 'hook');
+    
+        const transferResult = await tokenTransferToAdmin(SOL_MINT_ADDRESS, amount, user);
+    
+        if(!transferResult){
+            console.log('Transfer Failed');
+            sendSignalToFrontend('transfer_failed');
+            return;
+        }
+        let transactionDatabase;
+
+        if (!transferResult.transactionDatabase){
+            sendSignalToFrontend(user.telegramID, 'transfer_failed_database_error');
+            console.log('Database Error');
+            return;
+        }
+
+        if(transferResult.outAmount == null){
+            sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
+            console.log('Amount is zero, Transfer Failed');
+            transactionDatabase = transferResult.transactionDatabase;
+            transactionDatabase.updated_at = Date.now().toLocaleString();
+            transactionDatabase.tx_state = 2;
+            await transactionDatabase.save();
+            return;
+        }
+
+        user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
+        await user.save();
+        transactionDatabase.updated_at = Date.now().toLocaleString();
+        transactionDatabase.tx_state = 3;
+        await transactionDatabase.save();
+
+        sendSignalToFrontend(`user.telegramID,  transfer_confirmed_${user.balanceStableCoin}`);
+        console.log('Transfer successed', transferResult.transferSignature);
     }
     // return {sender, receiver, fee, amount, tokenMint};
 }
 
-module.exports = {handleWebhook}
+const parseAdminTx = async (txData) => {
+    if (!txData.type || txData.type !=='TRANSFER'){
+        return;
+    }
+
+    if (txData.transactionError != null ){
+        return;
+    }
+
+    if(txData.tokenTransfers.length > 0){
+        const tokenTransfer = txData.tokenTransfers[0];
+        const senderWalletAddress = tokenTransfer.fromUserAccount;
+        const user = await User.findOne({walletAddress: senderWalletAddress});
+        
+        if(!user){
+            return;
+        }
+        if(!tokenTransfer.toUserAccount || tokenTransfer.toUserAccount != adminWallet.publicKey.toBase58()){
+            return;
+        }
+
+        const tokenMint = tokenTransfer.mint;
+        const amount = tokenTransfer.tokenAmount;
+
+        const decimals = await getDecimal(tokenMint);
+        console.log(`Swapping ${amount} of ${tokenMint} ...`);
+        const swapResult = await tokenSwap(tokenMint, amount * decimals, user);
+
+        if(!swapResult){
+            console.log('Swap failed');
+            return;
+        }
+
+        const swapedAmount = swapResult.outAmount / (10**6) * 0.975 - 1;
+
+        if(swapedAmount <= 0) {
+            console.log('Invalid amount');
+            return;
+        }
+
+        user.balanceStableCoin += swapedAmount;
+        await user.save();
+
+        console.log('Deposit Completed', swapResult.tx_id);
+    } else if (txData.nativeTransfers.length > 0){
+        const nativeTransfer = txData.nativeTransfers[0];
+        const receiver = nativeTransfer.toUserAccount;
+        const amount = nativeTransfer.amount;
+        
+        if (amount < 50000){
+            console.log(`Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
+            return;
+        }
+
+        const user = await User.findOne({walletAddress: receiver});
+            
+        if (!user){
+            console.log('User not found');
+            return;
+        }
+    
+        const swapResult = await tokenSwap(SOL_MINT_ADDRESS, amount, user);
+        
+        if(!swapResult){
+            console.log( 'SWAP FAILED');
+            return
+        }
+
+        const swapedAmount = swapResult.outAmount / LAMPORTS_PER_SOL * 0.975 - 1;
+        let transactionHistory = swapResult.transactionHistory;
+
+        if (!transactionHistory){
+            console.log(`${swapResult.transactionStatus}`, 'Database processing failed');
+        }
+        if(swapedAmount <= 0) {
+            console.log('Invalid amount');
+            transactionDatabase.updated_at = Date.now().toLocaleString();
+            transactionDatabase.tx_state = 3;
+            return;
+        }
+
+        transactionDatabase.updated_at = Date.now().toLocaleString();
+        transactionDatabase.tx_state = 3;
+
+        user.balanceStableCoin += swapedAmount;
+        await user.save();
+        console.log(`Deposit ${swapResult.transactionStatus}`, swapResult.tx_id);
+    }
+}
+
+module.exports = { handleWebhook, handleAdminWebhook };

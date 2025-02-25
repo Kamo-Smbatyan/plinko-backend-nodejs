@@ -5,200 +5,104 @@ const dotenv = require('dotenv');
 const bs58 = require('bs58');
 const axios = require('axios');
 const {createTransferInstruction} = require('@solana/spl-token');
-const { adminWallet, connection, deserializeTransaction, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, sendBundleRequest, checkTransactionStatus, resolveAddressLookups } = require('../utils/helper');
-const {JUPITER_API_BASE_URL} = require('../config/constants');
+const { adminWallet, connection, sendSignalToFrontend, createTransactionInstructions, deserializeTransaction, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, sendBundleRequest, checkTransactionStatus, resolveAddressLookups } = require('../utils/helper');
+const {clients} = require('../config/constants');
+const TransactionHistory = require('../models/TransactionHistory');
 
 dotenv.config();
 
 const SOL_MINT_ADDRESS='So11111111111111111111111111111111111111112';
 const USDC_MINT=process.env.USDC_MINT;
 
-const swapMintToStable = async (mint, walletAddress, amount) => {
-    let signature;
-    let outAmount
+const tokenTransferToAdmin = async (mint, amount, user) => {
     try {
-        await delay(7000);// Delay to confriming user wallet transfer transaction 
-
-        const user = await User.findOne({walletAddress});
-        
-        if(!user){
-            throw new Error('Error fetching user data');
-        }
-
         const secretKey = user.secretKey;
         const userWallet = Keypair.fromSecretKey(bs58.decode(secretKey));
         const instructions = [];
-        let tokenBalance, latestBlockhash;
+        let tokenBalance = 0;
         let associatedTokenAccountForAdmin, associatedTokenAccountForUser ;
+        
         if(mint == SOL_MINT_ADDRESS){
+            let userBalance = await connection.getBalance(new PublicKey(user.walletAddress));
+            console.log(`Sol Balance ${amount / LAMPORTS_PER_SOL} ${userWallet.publicKey.toBase58()}`);
+            sendSignalToFrontend(user.telegramID, 'data: ' + 'sol' + '\n\n');
+            let retrying = 0
+            while (userBalance == 0){
+                delay(1000);
+                retrying ++;
+                userBalance = await connection.getBalance(new PublicKey(user.walletAddress));
+                if(retrying > 10){
+                    return;
+                }
+            }
+    
+            instructions.push(
+                SystemProgram.transfer({
+                    fromPubkey: userWallet.publicKey,
+                    toPubkey: adminWallet.publicKey,
+                    lamports: userBalance
+                })
+            );
 
-            // [tokenBalance, latestBlockhash] = await Promise.all([
-            //     connection.getBalance(userWallet.publicKey),
-            //     connection.getLatestBlockhash()
-            // ]);
-            // if (tokenBalance == 0){
-            //     throw new Error('Balance is zero');
-            // }
-
-            // console.log('Token Sol Balance',tokenBalance, userWallet.publicKey);
-            // instructions.push(
-            //     SystemProgram.transfer({
-            //         fromPubkey: userWallet.publicKey,
-            //         toPubkey:adminWallet.publicKey,
-            //         lamports: amount
-            //     })
-            // );
-            return;
-        }
-
-        else{
+            const latestBlockhash = await connection.getLatestBlockhash();
+            const versionedTransaction = await createVersionedTransaction([adminWallet, userWallet], instructions, latestBlockhash);
+            
+            console.log('Forwarding asset to admin wallet...');
+        } else{
+            console.log(`${amount} token to ${userWallet.publicKey.toBase58()}`);
+            sendSignalToFrontend(user.telegramID, 'data: ' + `token_${amount}` + '\n\n');
             [ associatedTokenAccountForAdmin, associatedTokenAccountForUser ] = await Promise.all([
                 getAssociatedTokenAddressSync(new PublicKey(mint), adminWallet.publicKey),
                 getAssociatedTokenAddressSync(new PublicKey(mint), userWallet.publicKey),
             ]);
-            
             const checkATAExists = await checkTokenAccountExistence(associatedTokenAccountForAdmin);
+
             if(!(checkATAExists)) {
                 instructions.push(createAssociatedTokenAccountInstruction(adminWallet.publicKey, associatedTokenAccountForAdmin, adminWallet.publicKey, new PublicKey(mint)));
             }
 
-            [ tokenBalance, latestBlockhash ] = await Promise.all([
-                getTokenBalance(associatedTokenAccountForUser),
-                connection.getLatestBlockhash()
-            ]);
+            while(tokenBalance === 0) {
+                try {
+                    tokenBalance = await getTokenBalance(associatedTokenAccountForUser);
+                } catch(err) { }
+                if(tokenBalance === 0) await delay(1000);
+            }
 
-            instructions.push(createTransferInstruction(associatedTokenAccountForUser, associatedTokenAccountForAdmin, userWallet.publicKey, amount));
+            instructions.push(createTransferInstruction(associatedTokenAccountForUser, associatedTokenAccountForAdmin, userWallet.publicKey, tokenBalance));
         }
+
+        const latestBlockhash = await connection.getLatestBlockhash();
         const versionedTransaction = await createVersionedTransaction([adminWallet, userWallet], instructions, latestBlockhash);
-
-        signature = await connection.sendRawTransaction(versionedTransaction.serialize(), [adminWallet, userWallet]);
-
-        console.log('Confirming...');
         
-        const confirmationStatus = await connection.getSignatureStatus(signature, {searchTransactionHistory: true});
+        console.log('Forwarding asset to admin wallet...');
+        const transferSignature = await connection.sendRawTransaction(versionedTransaction.serialize(), [adminWallet, userWallet]);
+        const transactionDatabase = await TransactionHistory.insertOne({
+            telegramID: user.telegramID,
+            signature: transferSignature,
+            mintAddress: mint,
+            inAmount: amount,
+            tx_type: 1,
+            tx_state: 1,
+            create_at: Date.now(),
+            updated_at: Date.now()
+        });
+        await transactionDatabase.save();
+        sendSignalToFrontend(user.telegramID, 'completed');
         
-        const signatureStatus = confirmationStatus.value;
-        if (signatureStatus && signatureStatus.err){
-            console.log('Confrimation Failed:', signatureStatus.err)
-            success = false;
-        } else{
-            console.log('Transfer Transaction sucessful', signature);
-            console.log(signatureStatus);
-        }        
-
-        let success = false;
-        let retryingNum = 0;
-        await delay(5000);
-        while(!success){
-            const adminWalletTokenBalance = await getTokenBalance(associatedTokenAccountForAdmin);
-            await delay(1000);
-            console.log('Fething balances.. Retrying ', retryingNum++, adminWalletTokenBalance );
-            if (adminWalletTokenBalance > amount){
-                success = true;
-            }
+        let outAmount = null;
+        try{
+            const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
+            const quoteResponseData = quoteResponse.data; 
+            outAmount = quoteResponseData.outAmount;
+            return {transferSignature, outAmount}
+        } catch (err){
+            console.log(err);
+            return {transferSignature, outAmount, transactionDatabase};
         }
 
-        success = false;
-        
-        console.log('Swapping', amount);
-        const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=${Math.floor(amount)}&slippageBps=10`);
-
-        const quoteData = quoteResponse.data;
-
-        if (!quoteData || quoteData.error){
-            throw new Error('Get swap quote failed');
-        }
-
-        outAmount = quoteData.outAmount;
-
-        const swapRequestBody = {
-            quoteResponse: quoteData,
-            userPublicKey: adminWallet.publicKey.toString(),
-            // dynamicComputeUnitLimit: true,
-            // prioritizationFeeLamports: {
-            //     jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
-            // },
-        };
-
-        const swapResponse = await axios.post(`https://api.jup.ag/swap/v1/swap`, swapRequestBody);
-        
-        if (swapResponse.error){
-            throw new Error('Failed to get swap instructions:');
-        }
-
-        const swapData = swapResponse.data;
-        
-        const message = deserializeTransaction(swapData.swapTransaction);
-        // const accountKeysFromLookups = await resolveAddressLookups(message);
-        // const swapInstructions = createTransactionInstructions(message, accountKeysFromLookups);
-
-        const versionedTrasnactionSwap = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64')) //await createVersionedTransaction([ adminWallet ], swapInstructions, latestBlockhash);
-        versionedTrasnactionSwap.sign([adminWallet]);
-        const transactionBinary = versionedTrasnactionSwap.serialize()
-        const swapTransactionSignature = versionedTrasnactionSwap.signatures[0];
-        const serializedSwapTransaction = bs58.encode(transactionBinary);
-        signature = await connection.sendRawTransaction(transactionBinary);
-        
-        success = false;
-        let retry = 0
-
-        while (!success){
-            const confirmSwap = await connection.getSignatureStatus(signature, {searchTransactionHistory: true});
-            const signatureStatus = confirmSwap.value;
-            if (signatureStatus && signatureStatus.err){
-                console.log('Confrimation Failed:', signatureStatus.err)
-                success = false;
-                retry++
-                
-                if (retry>5){
-                    console.log(`${retry} times retried, but failed`)
-                    break;
-                }
-
-                console.log(`Swap failed. Retrying(${retry})...`);
-
-                continue;
-            } else{
-                console.log('Transfer Transaction sucessful', signature);
-                success = true;
-            }
-            // const isSent = await sendBundleRequest([serializedSwapTransaction]);
-            // const result = await checkTransactionStatus(swapTransactionSignature, latestBlockhash);
-
-            // if(!isSent) {
-            //     retry++
-                
-            //     if (retry>5){
-            //         console.log(`${retry} times retried, but failed`)
-            //         return;
-            //     }
-
-            //     console.log(`Swap failed. Retrying(${retry})...`);
-
-            //     continue;
-            //     //throw new Error('Not confirmed swap transaction');
-            // }
-
-            // if(result.confirmed) {
-            //     console.log('Successfuly swaped!');
-            //     success = true;
-            // } else {
-
-            //     if (retry>5){
-            //         console.log(`${retry} times retried, but failed`)
-            //         return;
-            //     }
-
-            //     console.log(`Swap failed. Retrying(${retry})...`);
-            // } 
-        }   
-
-        return {tx_id: signature, outAmount};        
     } catch(err) {
         console.error(err);
-        if (signature){
-            return {tx_id: signature, outAmount}
-        }
+        return;
     }
 }
 
@@ -262,62 +166,174 @@ async function transferUSDC(sender, receiver, amount, mint){
     return signature;
 }
 
-async function tokenSwap(inputMint, outputMint, swapAmount){
+async function tokenSwap(inputMint, swapAmount, user){
     try{
-        const quoteResponse = await axios.get(`${JUPITER_API_BASE_URL.QUOTE}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${swapAmount}&slippageBps=10`);
-        const quoteData = quoteResponse.data;
-        //console.log(quoteData);
-        if(!quoteData || quoteData.error){
-            throw new Error('Get swap quote error.', quoteData);
+        let adminWalletTokenBalance = 0;
+        while(adminWalletTokenBalance === 0){
+            try {
+                adminWalletTokenBalance = await getTokenBalance(associatedTokenAccountForAdmin);
+            } catch(err) {}
+            
+            if(adminWalletTokenBalance === 0) await delay(1000);
         }
+        
+        console.log('Swapping', amount);
+        const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
+
+        const quoteData = quoteResponse.data;
+
+        if (!quoteData || quoteData.error){
+            throw new Error('Get swap quote failed');
+        }
+
+        const outAmount = quoteData.outAmount;
+
         const swapRequestBody = {
             quoteResponse: quoteData,
             userPublicKey: adminWallet.publicKey.toString(),
             dynamicComputeUnitLimit: true,
-            // prioritizationFeeLamports: {
-            //     jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
-            // },
+            prioritizationFeeLamports: {
+                jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
+            },
         };
-        const outputAmount = quoteData.outAmount
-        const swapResponse = await axios.post(JUPITER_API_BASE_URL.SWAP, swapRequestBody);
-        const swapData = swapResponse.data;
-        if (!swapData || swapData.error){
-            throw new Error('Get swap request error');
-        }
 
-        const swapTransactionString = swapData.swapTransaction;
-        const swapTransaction = VersionedTransaction.deserialize(Buffer.from(swapTransactionString, 'base64'));
-        swapTransaction.sign([adminWallet]);
-        const transactionBinary = swapTransaction.serialize();
-        const signature = await connection.sendRawTransaction(transactionBinary);
+        const swapResponse = await axios.post(`https://api.jup.ag/swap/v1/swap`, swapRequestBody);
         
-
-        let retry = 0;
-        while (true){
-            await delay(1000);
-            let confirmationStatus = await connection.getSignatureStatus(signature, {searchTransactionHistory:true});
-            const confirmResult = confirmationStatus.value
-            if(!(confirmResult == null) && confirmResult.err ){
-                if(retry<6){
-                    retry++;
-                    confirmationStatus = await connection.getSignatureStatus(signature, {searchTransactionHistory:true});
-                    console.log(`Swap transaction sent but confrimation faild. Retrying(${retry})`);
-                    continue;
-                }
-                else{
-                    console.log('Swap failed');
-                    return; 
-                }
-            }
-            else if (confirmResult?.confirmationStatus == 'confirmed'){
-                console.log("Success");
-                return {signature, outputAmount}
-            }
-            retry++
+        if (swapResponse.error){
+            throw new Error('Failed to get swap instructions:');
         }
-    }
-    catch{
+
+        const swapData = swapResponse.data;
+        
+        const message = deserializeTransaction(swapData.swapTransaction);
+        const accountKeysFromLookups = await resolveAddressLookups(message);
+        const swapInstructions = await createTransactionInstructions(message, accountKeysFromLookups);
+
+        const versionedTrasnactionSwap = await createVersionedTransaction([ adminWallet ], swapInstructions, latestBlockhash);
+        versionedTrasnactionSwap.sign([adminWallet]);
+        const transactionBinary = versionedTrasnactionSwap.serialize()
+        const swapTransactionSignature = versionedTrasnactionSwap.signatures[0];
+        const serializedSwapTransaction = bs58.encode(transactionBinary);
+        
+        const transactionHistory = await TransactionHistory.insertOne({
+            telegramID: user.telegramID,
+            signature: swapTransactionSignature,
+            mintAddress: USDC_MINT,
+            tx_type: 2,
+            tx_state: 1,
+            inAmount: swapAmount/LAMPORTS_PER_SOL,
+            outAmount: outAmount,
+            created_at: Date.now().toLocaleString(),
+            updated_at: Date.now().toLocaleString()
+        });
+
+        await transactionHistory.save();
+        let transactionStatus;
+        let isSent = false;
+        let reply = 0
+        while(!isSent) {
+            retry ++;
+            console.log(`Swap transaction pending...${retry}`);
+            isSent = await sendBundleRequest([serializedSwapTransaction]);
+            if(!isSent) {
+                await delay(1000);
+                if (retry > 5){
+                    transactionStatus = "Failed";
+                }
+            }
+            else{
+                transactionStatus = 'Sent';
+                break;
+            }
+        }
+
+        console.log('Swap transaction sent.')
+        let isConfirmed = false;
+        while(isConfirmed) {
+            console.log('Confirming...');
+            const result = await checkTransactionStatus(swapTransactionSignature, latestBlockhash);
+            if(!result.confirmed) {
+                await delay(1000);
+                isConfirmed = result.confirmed;
+            }
+            else {
+                transactionStatus = 'Confirmed';
+                break;
+            }
+        }
+
+        return { 
+            tx_id: swapTransactionSignature, 
+            outAmount,
+            transactionStatus,
+            transactionHistory
+        };
+    } catch(err) {
+        console.log(err)
         return ;
     }
 }
-module.exports = {swapMintToStable, userWithdraw, transferUSDC, tokenSwap};
+
+async function solSwap (swapAmount) {
+    try {
+        const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${NATIVE_MINT}&outputMint=${USDC_MINT}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
+
+        const quoteData = quoteResponse.data;
+
+        if (!quoteData || quoteData.error){
+            throw new Error('Get swap quote failed');
+        }
+
+        const outAmount = quoteData.outAmount;
+
+        const swapRequestBody = {
+            quoteResponse: quoteData,
+            userPublicKey: adminWallet.publicKey.toString(),
+            dynamicComputeUnitLimit: true,
+            prioritizationFeeLamports: {
+                jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
+            },
+        };
+
+        const swapResponse = await axios.post(`https://api.jup.ag/swap/v1/swap`, swapRequestBody);
+            
+        if (swapResponse.error){
+            throw new Error('Failed to get swap instructions:');
+        }
+
+        const swapData = swapResponse.data;
+            
+        const message = deserializeTransaction(swapData.swapTransaction);
+        const accountKeysFromLookups = await resolveAddressLookups(message);
+        const swapInstructions = await createTransactionInstructions(message, accountKeysFromLookups);
+
+        const versionedTrasnactionSwap = await createVersionedTransaction([ adminWallet ], swapInstructions, latestBlockhash);
+        versionedTrasnactionSwap.sign([adminWallet]);
+        const transactionBinary = versionedTrasnactionSwap.serialize()
+        const swapTransactionSignature = versionedTrasnactionSwap.signatures[0];
+        const serializedSwapTransaction = bs58.encode(transactionBinary);
+
+        let isSent = false;
+        while(!isSent) {
+            isSent = await sendBundleRequest([serializedSwapTransaction]);
+            if(!isSent) await delay(1000);
+        }
+
+        let isConfirmed = false;
+        while(isConfirmed) {
+            const result = await checkTransactionStatus(swapTransactionSignature, latestBlockhash);
+            if(!result.confirmed) await delay(1000);
+            isConfirmed = result.confirmed;
+        }
+
+        return { 
+            tx_id: swapTransactionSignature, 
+            outAmount
+        };
+    } catch(err) {
+        console.log(err);
+        return;
+    }
+}
+
+module.exports = {tokenTransferToAdmin, userWithdraw, transferUSDC, tokenSwap};

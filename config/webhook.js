@@ -1,8 +1,8 @@
 const User = require("../models/User");
+const {Keypair} = require('@solana/web3.js');
+const WEBHOOK_ID = require('./constants');
 const dotenv = require('dotenv');
-
 dotenv.config();
-const WEBHOOK_ID = require('./constants')
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SERVER_URL = process.env.SERVER_URL;
@@ -18,37 +18,31 @@ const getAllWalletAddresses = async () => {
   }
 };
 
-const getWebHooks = async () => {
+const getWebhooks = async () => {
   try {
     let url = `https://api.helius.xyz/v0/webhooks?api-key=${HELIUS_API_KEY}`;
     const res = await fetch(url);
     const data = await res.json();
-    console.log('WebHook', data)
+    console.log('Web Hook', data)
     if (Array.isArray(data) && data.length > 0) {
-      const walletArray = await getAllWalletAddresses();
-      for (const webhook of data){
-        if (webhook.webhookID != WEBHOOK_ID.getWebHookID()){
-          continue
-        }
-          WEBHOOK_ID.setWebHookID(webhook.webhookID);
-          if (walletArray != webhook.accountAddresses){
-            editWebhook(WEBHOOK_ID.getWebHookID());
-          }
-          return webhook.webhookID;
-      } // Return all webhook IDs
+      return data;  // Return all webhook IDs
     } else {
       return 'no'; // No webhooks found
     }
   } catch (error) {
-    console.error("Get webhooks error",error);
+    console.error("Get webhooks error", error);
     return 'failed';
   }
 };
 
-const createWebhook = async () => {
+const createWebhookUser = async () => {
   try {
     const walletArray = await getAllWalletAddresses();
     console.log('Wallet Array', walletArray);
+    if (!walletArray){
+      tempWallet = Keypair.generate();
+      walletArray = [tempWallet.publicKey]
+    }
     const response = await fetch(
       `https://api.helius.xyz/v0/webhooks?api-key=${HELIUS_API_KEY}`,
       {
@@ -65,12 +59,40 @@ const createWebhook = async () => {
       }
     );
     const data = await response.json();
-    WEBHOOK_ID.setWebHookID(data.webhookID);
+    WEBHOOK_ID.setUserWebHookID(data.webhookID);
+    // console.log('User webhook created', data);
+    return data.webhookID || 'no';
+  } catch (e) {
+    console.error("Webhook Creation error", e);
+    WEBHOOK_ID.setUserWebHookID(null);
+    return 'failed';
+  }
+};
+
+const createWebhookAdmin = async () => {
+  try {
+    const response = await fetch(
+      `https://api.helius.xyz/v0/webhooks?api-key=${HELIUS_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          webhookURL: `${SERVER_URL}/monitor/webhookAdmin/`,
+          transactionTypes: ['ANY'],
+          accountAddresses: [process.env.ADMIN_WALLET_ADDRESS],
+          webhookType: WEBHOOK_TYPE,
+        }),
+      }
+    );
+    const data = await response.json();
+    WEBHOOK_ID.setAdminWebhookID(data.webhookID);
     console.log('Web hook created', data)
     return data.webhookID || 'no';
   } catch (e) {
     console.error("Webhook Creation error", e);
-    WEBHOOK_ID.setWebHookID(null);
+    WEBHOOK_ID.setAdminWebhookID(null);
     return 'failed';
   }
 };
@@ -93,7 +115,7 @@ const deleteWebhook = async (webHookID) => {
   }
 };
 
-const editWebhook = async (webhookID) => {
+const editWebhookUser = async (webhookID) => {
   try {
     const walletArray = await getAllWalletAddresses();
     if(walletArray.length === 0) {
@@ -116,12 +138,12 @@ const editWebhook = async (webhookID) => {
     );
     const data = await response.json();
     console.log("Editting hook:", data);
+    
     if (data.error){
-      console.log("Editing webhook error", data.error);
+      // console.log("Editing webhook error", data.error);
       return;
     }
-    WEBHOOK_ID.setWebHookID(data.webhookID);
-    console.log('Editing webhook success.', WEBHOOK_ID.getWebHookID());
+
     return data.data && walletArray === data.accountAddresses;
   } catch (e) {
     console.error("edit webhook error", e);
@@ -129,4 +151,47 @@ const editWebhook = async (webhookID) => {
   }
 };
 
-module.exports = { editWebhook, createWebhook, deleteWebhook, getWebHooks };
+const editWebhookAdmin = async (webhookID) => {
+  try {
+    const walletArray = [process.env.ADMIN_WALLET_ADDRESS];
+    if(walletArray.length === 0) {
+      return;
+    }
+    const response = await fetch(
+      `https://api.helius.xyz/v0/webhooks/${webhookID}?api-key=${HELIUS_API_KEY}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          webhookURL:`${SERVER_URL}/monitor/webhookAdmin`,
+          transactionTypes: ["ANY"],
+          accountAddresses: walletArray,
+          webhookType: 'enhanced'
+        }),
+      }
+    );
+    const data = await response.json();
+    console.log("Editting hook:", data);
+    
+    if (data.error){
+      console.log("Editing webhook error", data.error);
+      return;
+    }
+
+    return data.data && walletArray === data.accountAddresses;
+  } catch (e) {
+    console.error("edit webhook error", e);
+    return false;
+  }
+};
+
+module.exports = { 
+  editWebhookUser,
+  editWebhookAdmin, 
+  deleteWebhook, 
+  getWebhooks, 
+  createWebhookAdmin, 
+  createWebhookUser 
+};

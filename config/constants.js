@@ -2,14 +2,26 @@ const dotenv = require('dotenv')
 
 dotenv.config();
 
-let WEBHOOK_ID = process.env.WEBHOOK_ID || null ;
+let clients = [];
 
-function setWebHookID(value){
-    WEBHOOK_ID = value
+let USER_WEBHOOK_ID =process.env.USER_WEBHOOK_ID || null ;
+
+let ADMIN_WEBHOOK_ID = process.env.ADMIN_WEBHOOK_ID || null;
+
+function setUserWebHookID(value){
+    USER_WEBHOOK_ID = value
 }
 
-function getWebHookID(){
-    return WEBHOOK_ID;
+function getUserWebHookID(){
+    return USER_WEBHOOK_ID;
+}
+
+function getAdminWebhookID(){
+    return ADMIN_WEBHOOK_ID
+}
+
+function setAdminWebhookID(value){
+    WEBHOOK_ADMIN = value;
 }
 
 const JITO_ENDPOINTS = [
@@ -38,9 +50,12 @@ const JUPITER_API_BASE_URL = {
 }
 
 module.exports = {
-    setWebHookID, 
-    getWebHookID,
+    setUserWebHookID, 
+    getUserWebHookID,
+    setAdminWebhookID,
+    getAdminWebhookID,
     JITO_ENDPOINTS,
     JITO_TIP_ACCOUNTS,
-    JUPITER_API_BASE_URL
+    JUPITER_API_BASE_URL,
+    clients
 };
