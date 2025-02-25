@@ -60,7 +60,7 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        await TransactionHistory.insertOne({
+        const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: transferResult.transferSignature.toString(),
             tx_type : 1,
@@ -74,6 +74,7 @@ const parseUserTx = async (txData) => {
             updated_at: Date.now()
         });
 
+        await transactionHistory.save();
         if(transferResult.outAmount == null){
             sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
             console.log('Amount is zero, Transfer Failed');
@@ -120,7 +121,7 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        const transactionHistory = await TransactionHistory.insertOne({
+        const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: transferResult.transferSignature.toString(),
             tx_type : 1,
@@ -133,6 +134,8 @@ const parseUserTx = async (txData) => {
             created_at: Date.now(),
             updated_at: Date.now()
         });
+
+        await transactionHistory.save();
 
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
         await user.save();
@@ -152,7 +155,6 @@ const parseUserTx = async (txData) => {
         sendSignalToFrontend(`user.telegramID,  transfer_confirmed_${user.balanceStableCoin}`);
         console.log('Transfer successed', transferResult.transferSignature);
     }
-    // return {sender, receiver, fee, amount, tokenMint};
 }
 
 const parseAdminTx = async (txData) => {
