@@ -61,7 +61,7 @@ const parseUserTx = async (txData) => {
         }
 
         TransactionHistory.insertOne({
-            telegramID: telegramID,
+            telegramID: user.telegramID,
             signature: transferResult.transferSignature,
             tx_type : 1,
             tx_state: 1,
