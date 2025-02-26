@@ -193,7 +193,6 @@ async function tokenSwap(inputMint, swapAmount, user){
             throw new Error('Failed to get swap instructions:');
         }
 
-        const latestBlockhash = connection.getLatestBlockhash();
         const swapData = swapResponse.data;
         
         const deserializedTransaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
@@ -210,9 +209,12 @@ async function tokenSwap(inputMint, swapAmount, user){
         // const serializedSwapTransaction = bs58.encode(transactionBinary);
 
         const swapTransactionSignature = deserializedTransaction.signatures[0];
-        console.log(deserializedTransaction.signatures)
+        console.log('Deserialized Transaction Signature:', deserializedTransaction.signatures);
         const serializedSwapTransaction = bs58.encode(rawTransaction);
         
+        const tx_id = connection.sendRawTransaction(rawTransaction);
+ 
+        const isConfirmed = checkTransactionStatus(tx_id);
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: swapTransactionSignature,
@@ -229,48 +231,49 @@ async function tokenSwap(inputMint, swapAmount, user){
         let transactionStatus;
         let isSent = false;
         let retry = 0
-        while(!isSent) {
-            retry ++;
-            console.log(`Swap transaction pending...${retry}`);
-            isSent = await sendBundleRequest([serializedSwapTransaction]);
-            if(!isSent) {
-                await delay(2000);
-                if (retry > 5){
-                    transactionStatus = TX_STATE.FAILED;
-                    break;
-                }
-            }
-            else{
-                transactionStatus = TX_STATE.SENT;
-                break;
-            }
-        }
+        // while(!isSent) {
+        //     retry ++;
+        //     console.log(`Swap transaction pending...${retry}`);
+        //     isSent = await sendBundleRequest([serializedSwapTransaction]);
+        //     if(!isSent) {
+        //         await delay(2000);
+        //         if (retry > 5){
+        //             transactionStatus = TX_STATE.FAILED;
+        //             break;
+        //         }
+        //     }
+        //     else{
+        //         transactionStatus = TX_STATE.SENT;
+        //         break;
+        //     }
+        // }
 
-        if(!isSent){
-            return;
-        }
-        retry = 0;
-        console.log('Swap transaction sent.')
-        let isConfirmed = false;
-        while(isConfirmed) {
-            console.log('Confirming...');
-            retry++
-            const result = await checkTransactionStatus(swapTransactionSignature, latestBlockhash);
-            if(!result.confirmed) {
-                if(retry > 5){
-                    transactionStatus = TX_STATE.FAILED
-                }
-                await delay(2000);
-                isConfirmed = result.confirmed;
-            }
-            else {
-                transactionStatus = TX_STATE.CONFIRMED;
-                break;
-            }
-        }
+        // if(!isSent){
+        //     return;
+        // }
+
+        // retry = 0;
+        // console.log('Swap transaction sent.')
+        // let isConfirmed = false;
+        // while(isConfirmed) {
+        //     console.log('Confirming...');
+        //     retry++
+        //     const result = await checkTransactionStatus(swapTransactionSignature, latestBlockhash);
+        //     if(!result.confirmed) {
+        //         if(retry > 5){
+        //             transactionStatus = TX_STATE.FAILED
+        //         }
+        //         await delay(2000);
+        //         isConfirmed = result.confirmed;
+        //     }
+        //     else {
+        //         transactionStatus = TX_STATE.CONFIRMED;
+        //         break;
+        //     }
+        // }
 
         return { 
-            tx_id: swapTransactionSignature, 
+            tx_id, 
             outAmount,
             transactionStatus,
             transactionHistory,

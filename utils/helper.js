@@ -124,9 +124,9 @@ const sendBundleRequest = async (serializedTransactions) => {
     const successfulResults = results.filter((result) => !(result instanceof Error));
 
     if (successfulResults.length > 0) {
-        console.log('Jito: At least one successful response');
-        console.log('Jito: Confirming transaction...');
-
+        // console.log('Jito: At least one successful response');
+        // console.log('Jito: Confirming transaction...');
+        console.log(signautre)
         return true;
     } else {
         console.log('Jito: No successful responses received for jito');
@@ -134,7 +134,7 @@ const sendBundleRequest = async (serializedTransactions) => {
     }
 }
 
-const checkTransactionStatus = async (signatures, latestBlockhash) => {
+const checkTransactionStatus = async (signatures) => {
     try {
         const confirmation = await connection.getSignatureStatus(signatures, {searchTransactionHistory: true});
 

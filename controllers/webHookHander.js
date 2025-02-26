@@ -15,7 +15,7 @@ const USDC_MINT = process.env.USDC_MINT;
 
 async function handleWebhook(req, res){
     const txData = req.body;
-    // console.log('Admin Transaction Received by Webhook:', txData);
+    // console.log('User Transaction Received by Webhook:', txData);
     if (txData.length > 0){
         await parseUserTx(txData[0]); 
     }
@@ -49,6 +49,8 @@ const parseUserTx = async (txData) => {
         }
 
         await sendMessageToClient(user.telegramID, 'hook');
+
+        console.log('User TX detected by WEBHOOK:', txData);
         const tokenMint = tokenTransfer.mint;
         const amount = tokenTransfer.tokenAmount;
         const decimals = await getDecimal(tokenMint);
