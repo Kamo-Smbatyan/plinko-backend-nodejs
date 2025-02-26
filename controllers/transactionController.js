@@ -209,12 +209,11 @@ async function tokenSwap(inputMint, swapAmount, user){
         // const serializedSwapTransaction = bs58.encode(transactionBinary);
 
         const swapTransactionSignature = deserializedTransaction.signatures[0];
-        console.log('Deserialized Transaction Signature:', deserializedTransaction.signatures);
         const serializedSwapTransaction = bs58.encode(rawTransaction);
         
         let tx_id;
         try{
-            tx_id = connection.sendRawTransaction(rawTransaction);
+            tx_id =await connection.sendRawTransaction(rawTransaction);
         }
         catch(err){
             console.log('Swap error on rpc');

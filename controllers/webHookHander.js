@@ -8,6 +8,7 @@ const dotenv = require('dotenv');
 const { NATIVE_MINT } = require("@solana/spl-token");
 const {TX_STATE, TX_TYPE} = require('../config/constants');
 
+let tempTxData = '';
 
 dotenv.config();
 const SOL_MINT_ADDRESS='So11111111111111111111111111111111111111112';
@@ -17,6 +18,10 @@ async function handleWebhook(req, res){
     const txData = req.body;
     // console.log('User Transaction Received by Webhook:', txData);
     if (txData.length > 0){
+        if(txData[0] === tempTxData){
+            return;
+        }
+        tempTxData = txData[0];
         await parseUserTx(txData[0]); 
     }
 }
