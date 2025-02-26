@@ -47,11 +47,12 @@ function socketHandler(io) {
 }
 
 function sendMessageToClient(telegramID, data){
-    if(getClient(telegramID)){
+    const clientTG = getClient(telegramID)
+    if(clientTG){
         console.log('client is not connected', telegramID);
         return;
     }
-    clients[telegramID].emit('transaction-state', data);
+    clientTG.emit('transaction-state', data);
 }
 
 module.exports = { socketHandler, sendMessageToClient};
