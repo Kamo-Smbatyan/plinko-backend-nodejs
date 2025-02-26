@@ -2,6 +2,18 @@ const dotenv = require('dotenv')
 
 dotenv.config();
 
+const TX_STATE = {
+    SENT: 'sent',
+    FAILED: 'failed',
+    CONFIRMED: 'confirmed',
+}
+
+const TX_TYPE = {
+    DEPOSIT: 'deposit',
+    SWAP: 'swap',
+    WIDRAW: 'withdraw',
+}
+
 let clients = [];
 
 let USER_WEBHOOK_ID =process.env.USER_WEBHOOK_ID || null ;
@@ -50,6 +62,8 @@ const JUPITER_API_BASE_URL = {
 }
 
 module.exports = {
+    TX_STATE,
+    TX_TYPE,
     setUserWebHookID, 
     getUserWebHookID,
     setAdminWebhookID,

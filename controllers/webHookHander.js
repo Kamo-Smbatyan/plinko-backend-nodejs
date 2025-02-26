@@ -7,6 +7,7 @@ const bs58 = require('bs58');
 const dotenv = require('dotenv');
 const {clients} = require('../config/constants');
 const { NATIVE_MINT } = require("@solana/spl-token");
+const {TX_STATE, TX_TYPE} = require('../config/constants');
 
 
 dotenv.config();
@@ -57,7 +58,7 @@ const parseUserTx = async (txData) => {
 
         console.log('TRANSFER TRANSACTION RESULT', transferResult);
 
-        if(!transferResult){
+        if(!transferResult || !transferResult.transferSignature){
             console.log('Transfer Failed');
               await sendSignalToFrontend(user.telegramID, 'transfer_failed');
             return;
@@ -66,12 +67,10 @@ const parseUserTx = async (txData) => {
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: transferResult.transferSignature.toString(),
-            tx_type : 1,
-            tx_state: 1,
+            tx_type : TX_TYPE.DEPOSIT,
+            tx_state: TX_STATE.SENT,
             inAmount: amount,
             mintAddress: tokenMint,
-            tx_type:  1, 
-            tx_state: 1,
             outAmount: transferResult.outAmount,
             created_at: Date.now(),
             updated_at: Date.now()
@@ -79,8 +78,9 @@ const parseUserTx = async (txData) => {
 
         await transactionHistory.save();
         if(transferResult.outAmount == null){
-            sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
-            console.log('Amount is zero, Transfer Failed');
+            sendSignalToFrontend(user.telegramID, 'transfer_failed_non_swapable');
+            console.log('Deposit made, but not swappable token');
+            return;
         }
 
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
@@ -90,25 +90,38 @@ const parseUserTx = async (txData) => {
 
         console.log('Transfer successed', transferResult.transferSignature);
 
-        await tokenSwap(tokenMint, amount * (10**decimals), user);
+        const swapResult = await tokenSwap(tokenMint, amount * (10**decimals), user);
 
+        if (!swapResult){
+            console.log('Transfer successed, but swapping failed');
+            return;
+        }
+        if(!swapResult.transactionHistory){
+            console.log("Transfer successfull, but swapping " , swapResult.transactionStatus , "!");
+            return;
+        }
+        transactionHistory.tx_state = swapResult.transactionStatus;
+        transactionHistory.updated_at = Date.now();
+        await transactionHistory.save();
+        return;
     } else if (txData.nativeTransfers.length > 0){
         const nativeTransfer = txData.nativeTransfers[0];
         const receiver = nativeTransfer.toUserAccount;
         const amount = nativeTransfer.amount;
 
-        if (amount < 50000){
-            console.log(`Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
-            return;
-        }
-
+        
         const user = await User.findOne({walletAddress: receiver});
             
         if (!user){
             console.log('User not found');
             return;
         }
-           
+        
+        if (amount < 50000){
+            console.log(`Deposit amount is too small: ${amount}`);
+            return;
+        }
+
         await sendSignalToFrontend(user.telegramID, 'hook');
     
         const transferResult = await tokenTransferToAdmin(SOL_MINT_ADDRESS, amount, user);
@@ -128,12 +141,10 @@ const parseUserTx = async (txData) => {
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: transferResult.transferSignature.toString(),
-            tx_type : 1,
-            tx_state: 1,
+            tx_type : 'transfer',
+            tx_state: 'sent',
             inAmount: amount,
             mintAddress: tokenMint,
-            tx_type:  1, 
-            tx_state: 1,
             outAmount: transferResult.outAmount,
             created_at: Date.now(),
             updated_at: Date.now()

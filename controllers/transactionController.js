@@ -6,7 +6,7 @@ const bs58 = require('bs58');
 const axios = require('axios');
 const {createTransferInstruction} = require('@solana/spl-token');
 const { adminWallet, connection, sendSignalToFrontend, createTransactionInstructions, deserializeTransaction, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, sendBundleRequest, checkTransactionStatus, resolveAddressLookups } = require('../utils/helper');
-const {clients} = require('../config/constants');
+const {TX_STATE, TX_TYPE} = require('../config/constants');
 const TransactionHistory = require('../models/TransactionHistory');
 
 dotenv.config();
@@ -163,7 +163,7 @@ async function tokenSwap(inputMint, swapAmount, user){
             try {
                 adminWalletTokenBalance = await getTokenBalance(associatedTokenAccountForAdmin);
             } catch(err) {
-                console.log("Error occurred in get tokenBalance")
+                console.log("Error occurred in get tokenBalance");
             }
             if(adminWalletTokenBalance === 0) {
                 await delay(2000);
@@ -221,9 +221,9 @@ async function tokenSwap(inputMint, swapAmount, user){
             telegramID: user.telegramID,
             signature: swapTransactionSignature,
             mintAddress: USDC_MINT,
-            tx_type: 2,
-            tx_state: 1,
-            inAmount: swapAmount/LAMPORTS_PER_SOL,
+            tx_type: TX_TYPE.SWAP,
+            tx_state: TX_STATE.SENT,
+            inAmount: swapAmount/(10**6),
             outAmount: outAmount,
             created_at: Date.now(),
             updated_at: Date.now()
@@ -240,12 +240,12 @@ async function tokenSwap(inputMint, swapAmount, user){
             if(!isSent) {
                 await delay(1000);
                 if (retry > 5){
-                    transactionStatus = "Failed";
+                    transactionStatus = TX_STATE.FAILED;
                     break;
                 }
             }
             else{
-                transactionStatus = 'Sent';
+                transactionStatus = TX_STATE.SENT;
                 break;
             }
         }
@@ -253,18 +253,22 @@ async function tokenSwap(inputMint, swapAmount, user){
         if(!isSent){
             return;
         }
-
+        retry = 0;
         console.log('Swap transaction sent.')
         let isConfirmed = false;
         while(isConfirmed) {
             console.log('Confirming...');
+            retry++
             const result = await checkTransactionStatus(swapTransactionSignature, latestBlockhash);
             if(!result.confirmed) {
-                await delay(1000);
+                if(retry > 5){
+                    transactionStatus = TX_STATE.FAILED
+                }
+                await delay(2000);
                 isConfirmed = result.confirmed;
             }
             else {
-                transactionStatus = 'Confirmed';
+                transactionStatus = TX_STATE.CONFIRMED;
                 break;
             }
         }
