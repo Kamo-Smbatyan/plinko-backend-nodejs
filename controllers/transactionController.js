@@ -201,15 +201,21 @@ async function tokenSwap(inputMint, swapAmount, user){
         const latestBlockhash = connection.getLatestBlockhash();
         const swapData = swapResponse.data;
         
-        const message = deserializeTransaction(swapData.swapTransaction);
-        const accountKeysFromLookups = await resolveAddressLookups(message);
-        const swapInstructions = await createTransactionInstructions(message, accountKeysFromLookups);
+        const deserializedTransaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction));
+        deserializedTransaction.sign([adminWallet]);
+        const rawTransaction = deserializedTransaction.serialize();
+        // const message = deserializeTransaction(swapData.swapTransaction);
+        // const accountKeysFromLookups = await resolveAddressLookups(message);
+        // const swapInstructions = await createTransactionInstructions(message, accountKeysFromLookups);
 
-        const versionedTrasnactionSwap = await createVersionedTransaction([adminWallet], swapInstructions, latestBlockhash);
+        // const versionedTrasnactionSwap = await createVersionedTransaction([adminWallet], swapInstructions, latestBlockhash);
         // versionedTrasnactionSwap.sign([adminWallet]);
-        const transactionBinary = versionedTrasnactionSwap.serialize()
-        const swapTransactionSignature = versionedTrasnactionSwap.signatures[0];
-        const serializedSwapTransaction = bs58.encode(transactionBinary);
+        // const transactionBinary = versionedTrasnactionSwap.serialize()
+        // const swapTransactionSignature = versionedTrasnactionSwap.signatures[0];
+        // const serializedSwapTransaction = bs58.encode(transactionBinary);
+
+        const swapTransactionSignature = deserializedTransaction.signatures[0];
+        const serializedSwapTransaction = bs58.encode(rawTransaction);
         
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
@@ -235,6 +241,7 @@ async function tokenSwap(inputMint, swapAmount, user){
                 await delay(1000);
                 if (retry > 5){
                     transactionStatus = "Failed";
+                    break;
                 }
             }
             else{

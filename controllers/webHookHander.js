@@ -190,6 +190,7 @@ const parseAdminTx = async (txData) => {
     if(txData.tokenTransfers.length > 0){
         const tokenTransfer = txData.tokenTransfers[0];
         const receiver = tokenTransfer.fromUserAccount;
+        
         const user = await User.findOne({walletAddress: receiver});
         
         if(!user){
@@ -229,7 +230,7 @@ const parseAdminTx = async (txData) => {
         const receiver = nativeTransfer.toUserAccount;
         const amount = nativeTransfer.amount;
         
-        if (amount < 50000){
+        if (amount < 100000){
             console.log(`Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
             return;
         }
