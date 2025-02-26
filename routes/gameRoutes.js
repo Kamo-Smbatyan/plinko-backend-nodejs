@@ -11,15 +11,15 @@ router.get("/events", async (req, res) => {
         return;
     }
     console.log('Event Telegram ID:::::::::', telegramID)
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+    });
 
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("Access-Control-Allow-Origin", "*");
-
-    // Store client response
     clients[telegramID] = res;
-    console.log('Current clients:', clients.length)
+    console.log('Current clients:', Object.keys(clients).length)
     clients[telegramID].write('data: '+"test"+'\n\n');
     // Handle disconnection
     req.on("close", () => {
