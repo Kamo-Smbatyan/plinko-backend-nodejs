@@ -16,20 +16,15 @@ const transactionRouter = require('./routes/transactionRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const wsPort = 5001;
+const wsPort = 3000;
 const io = new Server(wsPort, {
     cors:{
         origin: '*',
         methods:['GET', 'POST']
     },
 });
-const socketServer = io.listen(wsPort);
-socketServer.on('connection', (socket) => {
-    console.log('WebSocket client connected');
-    // Add WebSocket events here if needed
-});
 
-socketHandler(socketServer);
+socketHandler(io);
 app.use(cors());
 app.use(bodyParser.json());
 
