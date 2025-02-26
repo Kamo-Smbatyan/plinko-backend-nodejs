@@ -10,17 +10,13 @@ router.get("/events", async (req, res) => {
         res.status(400).json({ error: "Missing telegramID" });
         return;
     }
-    console.log('Event Telegram ID:::::::::', telegramID)
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*'
     });
-
-    clients[telegramID] = res;
-    console.log('Current clients:', Object.keys(clients).length);
-    clients[telegramID].write('data: '+"test"+'\n\n');
+    res.write('data: '+"test"+'\n\n');
     // Handle disconnection
     req.on("close", () => {
         delete clients[telegramID];
