@@ -41,7 +41,6 @@ function socketHandler(io) {
         });
 
         socket.on("disconnect", () => {
-            removeClient(telegramID)
             console.log(`❌ Client disconnected: ${socket.id}`);
         });
     });
