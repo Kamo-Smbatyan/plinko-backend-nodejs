@@ -33,7 +33,7 @@ function socketHandler(io) {
                 if (!user){
                     return;
                 }
-                addClient(telegramID, socket);                
+                addClient(telegramID, socket);
             }
             catch (err){
                 socket.emit('transaction-state', err)
@@ -47,12 +47,17 @@ function socketHandler(io) {
 }
 
 function sendMessageToClient(telegramID, data){
-    const clientTG = getClient(telegramID)
-    if(clientTG){
-        console.log('client is not connected', telegramID);
-        return;
+    try
+        {const clientTG = getClient(telegramID)
+        if(!clientTG){
+            console.log('client is not connected', telegramID);
+            return;
+        }
+        clientTG.emit('transaction-state', data);
     }
-    clientTG.emit('transaction-state', data);
+    catch(err){
+        console.log("Cannot send data by socket");
+    }
 }
 
 module.exports = { socketHandler, sendMessageToClient};
