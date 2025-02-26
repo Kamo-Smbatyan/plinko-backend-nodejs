@@ -19,7 +19,7 @@ router.get("/events", async (req, res) => {
     res.write('data: '+"test"+'\n\n');
     // Handle disconnection
     req.on("close", () => {
-        delete clients[telegramID];
+        
     });
 });
 
