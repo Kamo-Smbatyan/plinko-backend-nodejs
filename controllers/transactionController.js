@@ -159,7 +159,7 @@ async function tokenSwap(inputMint, swapAmount, user){
     try{
         let adminWalletTokenBalance = 0;
         const associatedTokenAccountForAdmin = getAssociatedTokenAddressSync(new PublicKey(inputMint), adminWallet.publicKey);
-        while(adminWalletTokenBalance === 0){
+        while(adminWalletTokenBalance > swapAmount){
             try {
                 adminWalletTokenBalance = await getTokenBalance(associatedTokenAccountForAdmin);
             } catch(err) {
@@ -201,7 +201,7 @@ async function tokenSwap(inputMint, swapAmount, user){
         const latestBlockhash = connection.getLatestBlockhash();
         const swapData = swapResponse.data;
         
-        const deserializedTransaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction));
+        const deserializedTransaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
         deserializedTransaction.sign([adminWallet]);
         const rawTransaction = deserializedTransaction.serialize();
         // const message = deserializeTransaction(swapData.swapTransaction);
