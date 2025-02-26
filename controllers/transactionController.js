@@ -210,6 +210,7 @@ async function tokenSwap(inputMint, swapAmount, user){
         // const serializedSwapTransaction = bs58.encode(transactionBinary);
 
         const swapTransactionSignature = deserializedTransaction.signatures[0];
+        console.log(deserializedTransaction.signatures)
         const serializedSwapTransaction = bs58.encode(rawTransaction);
         
         const transactionHistory = new TransactionHistory({
@@ -233,7 +234,7 @@ async function tokenSwap(inputMint, swapAmount, user){
             console.log(`Swap transaction pending...${retry}`);
             isSent = await sendBundleRequest([serializedSwapTransaction]);
             if(!isSent) {
-                await delay(1000);
+                await delay(2000);
                 if (retry > 5){
                     transactionStatus = TX_STATE.FAILED;
                     break;

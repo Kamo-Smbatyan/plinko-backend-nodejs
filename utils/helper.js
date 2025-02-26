@@ -55,7 +55,7 @@ const createTransactionInstructions = (message, accountKeysFromLookups) => {
 
 const createVersionedTransaction = async (payer, instructions, latestBlockhash) => {
     try {
-        console.log('PAYER:', payer, instructions, latestBlockhash);
+        //console.log('PAYER:', payer, instructions, latestBlockhash);
         const message = new TransactionMessage({
             payerKey: payer[0].publicKey,
             recentBlockhash: latestBlockhash.blockhash,
@@ -102,14 +102,20 @@ const getTokenBalance = async (associatedTokenAccount) => {
 
 const sendBundleRequest = async (serializedTransactions) => {
     const request = JITO_ENDPOINTS.map((url) => 
-        axios.post(url, {
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'sendBundle',
-            params: [serializedTransactions]}, {
-                headers: { 'Content-Type': 'application/json' }
-            })
-        );
+        axios.post(url, 
+            {
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'sendBundle',
+                params: [serializedTransactions]
+            }, 
+            {
+                headers: { 
+                    'Content-Type': 'application/json' 
+                }
+            }
+        )
+    );
     
     console.log('Jito: Sending transactions to endpoints...');
     
@@ -128,16 +134,9 @@ const sendBundleRequest = async (serializedTransactions) => {
     }
 }
 
-const checkTransactionStatus = async (signature, latestBlockhash) => {
+const checkTransactionStatus = async (signatures, latestBlockhash) => {
     try {
-        const confirmation = await connection.confirmTransaction(
-            {
-                signature,
-                lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-                blockhash: latestBlockhash.blockhash,
-            },
-            connection.commitment,
-        );
+        const confirmation = await connection.getSignatureStatus(signatures, {searchTransactionHistory: true});
 
         return { confirmed: !confirmation.value.err, err: confirmation.value.err };
     } catch (error) {
@@ -161,7 +160,6 @@ async function getDecimal(mint) {
         });
         
         const decimals = response.data?.result?.token_info?.decimals;
-        console.log("Decimals:", decimals);
         return decimals;
     } catch (error) {
         console.error("Error fetching decimals:", error);
