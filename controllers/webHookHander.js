@@ -101,7 +101,12 @@ const parseUserTx = async (txData) => {
             console.log("Transfer successfull, but swapping " , swapResult.transactionStatus , "!");
             return;
         }
-        transactionHistory.tx_state = swapResult.transactionStatus;
+        if (swapResult.isConfirmed){
+            transactionHistory.tx_state = TX_STATE.CONFIRMED;
+        }
+        else {
+            transactionHistory.tx_state = TX_STATE.FAILED;
+        }
         transactionHistory.updated_at = Date.now();
         await transactionHistory.save();
         return;
@@ -141,8 +146,8 @@ const parseUserTx = async (txData) => {
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: transferResult.transferSignature.toString(),
-            tx_type : 'transfer',
-            tx_state: 'sent',
+            tx_type : TX_TYPE.DEPOSIT,
+            tx_state: TX_STATE.SENT,
             inAmount: amount,
             mintAddress: tokenMint,
             outAmount: transferResult.outAmount,

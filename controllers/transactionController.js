@@ -235,7 +235,6 @@ async function tokenSwap(inputMint, swapAmount, user){
         });
 
         await transactionHistory.save();
-        let transactionStatus;
         // let isSent = false;
         // let retry = 0
         // while(!isSent) {
@@ -282,7 +281,6 @@ async function tokenSwap(inputMint, swapAmount, user){
         return { 
             tx_id, 
             outAmount,
-            transactionStatus,
             transactionHistory,
             isConfirmed,
         };
