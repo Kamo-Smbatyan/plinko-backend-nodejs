@@ -212,7 +212,14 @@ async function tokenSwap(inputMint, swapAmount, user){
         console.log('Deserialized Transaction Signature:', deserializedTransaction.signatures);
         const serializedSwapTransaction = bs58.encode(rawTransaction);
         
-        const tx_id = connection.sendRawTransaction(rawTransaction);
+        let tx_id;
+        try{
+            tx_id = connection.sendRawTransaction(rawTransaction);
+        }
+        catch(err){
+            console.log('Swap error on rpc');
+            tx_id = 0;
+        }
  
         const isConfirmed = checkTransactionStatus(tx_id);
         const transactionHistory = new TransactionHistory({
@@ -229,8 +236,8 @@ async function tokenSwap(inputMint, swapAmount, user){
 
         await transactionHistory.save();
         let transactionStatus;
-        let isSent = false;
-        let retry = 0
+        // let isSent = false;
+        // let retry = 0
         // while(!isSent) {
         //     retry ++;
         //     console.log(`Swap transaction pending...${retry}`);
