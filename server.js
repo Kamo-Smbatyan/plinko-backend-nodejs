@@ -16,7 +16,7 @@ const transactionRouter = require('./routes/transactionRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(80, {
+const io = new Server(5001, {
     cors:{
         origin: '*',
         methods:['GET', 'POST']
