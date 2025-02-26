@@ -19,7 +19,7 @@ router.get("/events", async (req, res) => {
     });
 
     clients[telegramID] = res;
-    console.log('Current clients:', Object.keys(clients).length)
+    console.log('Current clients:', Object.keys(clients).length);
     clients[telegramID].write('data: '+"test"+'\n\n');
     // Handle disconnection
     req.on("close", () => {

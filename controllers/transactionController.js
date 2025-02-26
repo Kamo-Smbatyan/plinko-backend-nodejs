@@ -286,67 +286,13 @@ async function tokenSwap(inputMint, swapAmount, user){
     }
 }
 
-async function solSwap (swapAmount) {
+async function solSwap (swapAmount, user) {
     try {
-        const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${NATIVE_MINT}&outputMint=${USDC_MINT}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
-
-        const quoteData = quoteResponse.data;
-
-        if (!quoteData || quoteData.error){
-            throw new Error('Get swap quote failed');
-        }
-
-        const outAmount = quoteData.outAmount;
-
-        const swapRequestBody = {
-            quoteResponse: quoteData,
-            userPublicKey: adminWallet.publicKey.toString(),
-            dynamicComputeUnitLimit: true,
-            prioritizationFeeLamports: {
-                jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
-            },
-        };
-
-        const swapResponse = await axios.post(`https://api.jup.ag/swap/v1/swap`, swapRequestBody);
-            
-        if (swapResponse.error){
-            throw new Error('Failed to get swap instructions:');
-        }
-
-        const swapData = swapResponse.data;
-            
-        const message = deserializeTransaction(swapData.swapTransaction);
-        const accountKeysFromLookups = await resolveAddressLookups(message);
-        const swapInstructions = await createTransactionInstructions(message, accountKeysFromLookups);
-        const latestBlockhash = connection.getLatestBlockhash();
-        const versionedTrasnactionSwap = await createVersionedTransaction([ adminWallet ], swapInstructions, latestBlockhash);
-        versionedTrasnactionSwap.sign([adminWallet]);
-        const transactionBinary = versionedTrasnactionSwap.serialize()
-        const swapTransactionSignature = versionedTrasnactionSwap.signatures[0];
-        const serializedSwapTransaction = bs58.encode(transactionBinary);
-
-        let isSent = false;
-        while(!isSent) {
-            isSent = await sendBundleRequest([serializedSwapTransaction]);
-            if(!isSent) await delay(1000);
-        }
-
-        let isConfirmed = false;
-        while(isConfirmed) {
-            const result = await checkTransactionStatus(swapTransactionSignature, latestBlockhash);
-            if(!result.confirmed) await delay(1000);
-            isConfirmed = result.confirmed;
-        }
-
-        return { 
-            tx_id: swapTransactionSignature, 
-            outAmount: outAmount,
-            isConfirmed: isConfirmed,
-        };
+        await tokenSwap(NATIVE_MINT, swapAmount, user)
     } catch(err) {
         console.log(err);
         return;
     }
 }
 
-module.exports = {tokenTransferToAdmin, userWithdraw, transferUSDC, tokenSwap};
+module.exports = {tokenTransferToAdmin, userWithdraw, transferUSDC, tokenSwap, solSwap};

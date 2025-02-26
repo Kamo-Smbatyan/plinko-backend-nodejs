@@ -2,10 +2,9 @@ const { LAMPORTS_PER_SOL, Keypair } = require("@solana/web3.js");
 const User = require("../models/User");
 const TransactionHistory = require('../models/TransactionHistory');
 const {tokenTransferToAdmin, tokenSwap} = require('./transactionController');
-const {adminWallet, connection, getDecimal, sendSignalToFrontend} = require('../utils/helper');
-const bs58 = require('bs58');
+const {sendMessageToClient} = require('../socket/socketHandler');
+const {adminWallet, getDecimal} = require('../utils/helper');
 const dotenv = require('dotenv');
-const {clients} = require('../config/constants');
 const { NATIVE_MINT } = require("@solana/spl-token");
 const {TX_STATE, TX_TYPE} = require('../config/constants');
 
@@ -49,7 +48,7 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        await sendSignalToFrontend(user.telegramID, 'hook');
+        await sendMessageToClient(user.telegramID, 'hook');
         const tokenMint = tokenTransfer.mint;
         const amount = tokenTransfer.tokenAmount;
         const decimals = await getDecimal(tokenMint);
@@ -60,7 +59,7 @@ const parseUserTx = async (txData) => {
 
         if(!transferResult || !transferResult.transferSignature){
             console.log('Transfer Failed');
-              await sendSignalToFrontend(user.telegramID, 'transfer_failed');
+            await sendMessageToClient(user.telegramID, 'transfer_failed');
             return;
         }        
 
@@ -78,7 +77,7 @@ const parseUserTx = async (txData) => {
 
         await transactionHistory.save();
         if(transferResult.outAmount == null){
-            sendSignalToFrontend(user.telegramID, 'transfer_failed_non_swapable');
+            sendMessageToClient(user.telegramID, 'transfer_failed_non_swapable');
             console.log('Deposit made, but not swappable token');
             return;
         }
@@ -86,7 +85,7 @@ const parseUserTx = async (txData) => {
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
         await user.save();
 
-        await sendSignalToFrontend( user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
+        await sendMessageToClient( user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
 
         console.log('Transfer successed', transferResult.transferSignature);
 
@@ -108,7 +107,6 @@ const parseUserTx = async (txData) => {
         const nativeTransfer = txData.nativeTransfers[0];
         const receiver = nativeTransfer.toUserAccount;
         const amount = nativeTransfer.amount;
-
         
         const user = await User.findOne({walletAddress: receiver});
             
@@ -122,18 +120,18 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        await sendSignalToFrontend(user.telegramID, 'hook');
+        await sendMessageToClient(user.telegramID, 'hook');
     
         const transferResult = await tokenTransferToAdmin(SOL_MINT_ADDRESS, amount, user);
     
         if(!transferResult){
             console.log('Transfer Failed');
-            await sendSignalToFrontend(user.telegramID, 'transfer_failed');
+            await sendMessageToClient(user.telegramID, 'transfer_failed');
             return;
         }
 
         if (!transferResult.transactionDatabase){
-            sendSignalToFrontend(user.telegramID, 'transfer_failed_database_error');
+            sendMessageToClient(user.telegramID, 'transfer_failed_database_error');
             console.log('Database Error');
             return;
         }
@@ -156,7 +154,7 @@ const parseUserTx = async (txData) => {
         await user.save();
 
         if(transferResult.outAmount == null){
-            await sendSignalToFrontend(user.telegramID, 'transfer_failed_amount_zero');
+            await sendMessageToClient(user.telegramID, 'transfer_failed_amount_zero');
             console.log('Amount is zero, Transfer Failed');
             return;
         }
@@ -167,7 +165,7 @@ const parseUserTx = async (txData) => {
         transactionHistory.tx_state = 3;
         await transactionHistory.save();
 
-        await sendSignalToFrontend(user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
+        await sendMessageToClient(user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
         console.log('Transfer successed', transferResult.transferSignature);
         const swapResult = await tokenSwap(NATIVE_MINT, amount , user); ///send swap transaction
         const swapTransactionHis = swapResult.transactionHistory;

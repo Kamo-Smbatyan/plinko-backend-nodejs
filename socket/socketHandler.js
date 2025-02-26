@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const {clients, addClient, removeClient, getClient} = require('../config/constants')
 
 function socketHandler(io) {
     io.on("connection", (socket) => {
@@ -22,11 +23,36 @@ function socketHandler(io) {
                 socket.emit("update-failed", { error: "Update failed" });
             }
         });
+        socket.on('transaction-state', async(data) => {
+            try{
+                const telegramID = data.telegramID;
+                if(!telegramID){
+                    return;
+                }
+                const user = await User.findOne({telegramID: telegramID});
+                if (!user){
+                    return;
+                }
+                addClient(telegramID, socket);                
+            }
+            catch (err){
+                socket.emit('transaction-state', err)
+            }
+        });
 
         socket.on("disconnect", () => {
+            removeClient(telegramID)
             console.log(`❌ Client disconnected: ${socket.id}`);
         });
     });
 }
 
-module.exports = { socketHandler };
+function sendMessageToClient(telegramID, data){
+    if(!clients[telegramID]){
+        console.log('client is not connected', telegramID);
+        return;
+    }
+    clients[telegramID].emit('transaction-state', data);
+}
+
+module.exports = { socketHandler, sendMessageToClient};

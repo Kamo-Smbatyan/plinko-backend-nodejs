@@ -16,6 +16,18 @@ const TX_TYPE = {
 
 let clients = [];
 
+function addClient(telegramID, ws){
+    clients[telegramID] = ws;
+}
+
+function removeClient(telegramID){
+    delete clients[telegramID];
+}
+
+function getClient(telegramID){
+    return clients[telegramID]
+}
+
 let USER_WEBHOOK_ID =process.env.USER_WEBHOOK_ID || null ;
 
 let ADMIN_WEBHOOK_ID = process.env.ADMIN_WEBHOOK_ID || null;
@@ -68,6 +80,9 @@ module.exports = {
     getUserWebHookID,
     setAdminWebhookID,
     getAdminWebhookID,
+    addClient,
+    removeClient,
+    getClient,
     JITO_ENDPOINTS,
     JITO_TIP_ACCOUNTS,
     JUPITER_API_BASE_URL,
