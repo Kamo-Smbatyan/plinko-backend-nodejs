@@ -162,7 +162,7 @@ const parseUserTx = async (txData) => {
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
         await user.save();
         transactionHistory.updated_at = Date.now();
-        transactionHistory.tx_state = 3;
+        transactionHistory.tx_state = TX_STATE.CONFIRMED;
         await transactionHistory.save();
 
         await sendMessageToClient(user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
@@ -174,12 +174,12 @@ const parseUserTx = async (txData) => {
             return;
         }
         if (swapResult.isConfirmed){
-            swapTransactionHis.tx_state = 3;
+            swapTransactionHis.tx_state = TX_STATE.CONFIRMED;
             swapTransactionHis.updated_at = Date.now();
             console.log('Swapped successfully')
         }
         else{
-            swapTransactionHis.tx_state = 3;
+            swapTransactionHis.tx_state = TX_STATE.SENT;
             swapTransactionHis.updated_at = Date.now();
             console.log('Swap transaction sent, but not confirmed');
         }
@@ -267,12 +267,12 @@ const parseAdminTx = async (txData) => {
         if(swapedAmount <= 0) {
             console.log('Invalid amount');
             transactionDatabase.updated_at = Date.now();
-            transactionDatabase.tx_state = 3;
+            transactionDatabase.tx_state = TX_STATE.FAILED;
             return;
         }
 
         transactionDatabase.updated_at = Date.now();
-        transactionDatabase.tx_state = 3;
+        transactionDatabase.tx_state = TX_STATE.CONFIRMED;
 
         user.balanceStableCoin += swapedAmount;
         await user.save();

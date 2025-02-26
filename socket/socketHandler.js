@@ -1,5 +1,5 @@
 const User = require("../models/User");
-const {clients, addClient, removeClient, getClient} = require('../config/constants')
+const {clients, addClient, getClient} = require('../config/constants')
 
 function socketHandler(io) {
     io.on("connection", (socket) => {
@@ -47,7 +47,7 @@ function socketHandler(io) {
 }
 
 function sendMessageToClient(telegramID, data){
-    if(!clients[telegramID]){
+    if(getClient(telegramID)){
         console.log('client is not connected', telegramID);
         return;
     }
