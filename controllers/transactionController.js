@@ -159,17 +159,12 @@ async function tokenSwap(inputMint, swapAmount, user){
     try{
         let adminWalletTokenBalance = 0;
         const associatedTokenAccountForAdmin = getAssociatedTokenAddressSync(new PublicKey(inputMint), adminWallet.publicKey);
-        while(adminWalletTokenBalance > swapAmount){
-            try {
-                adminWalletTokenBalance = await getTokenBalance(associatedTokenAccountForAdmin);
-            } catch(err) {
-                console.log("Error occurred in get tokenBalance");
+        while(adminWalletTokenBalance < swapAmount){
+            adminWalletTokenBalance = await getTokenBalance(associatedTokenAccountForAdmin);
+            await delay(2000);
+            if (adminWalletTokenBalance >= swapAmount){
+                break;
             }
-            if(adminWalletTokenBalance === 0) {
-                await delay(2000);
-                continue;
-            }
-            else{ break; }
         }
         
         console.log('Swapping', swapAmount, adminWalletTokenBalance);
