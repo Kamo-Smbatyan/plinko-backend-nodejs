@@ -53,19 +53,19 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        await sendMessageToClient(user.telegramID, 'hook');
-
         const tokenMint = tokenTransfer.mint;
         const amount = tokenTransfer.tokenAmount;
         const decimals = await getDecimal(tokenMint);
 
+        await sendMessageToClient(user.telegramID, 'Deposit', 'hook', amount, tokenMint);
+        
         const transferResult = await tokenTransferToAdmin(tokenMint, amount, user);// token transfer
 
         console.log('TRANSFER TRANSACTION RESULT', transferResult);
 
         if(!transferResult || !transferResult.transferSignature){
             console.log('Transfer Failed');
-            await sendMessageToClient(user.telegramID, 'transfer_failed');
+            await sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
             return;
         }        
 
@@ -83,7 +83,7 @@ const parseUserTx = async (txData) => {
 
         await transactionHistory.save();
         if(transferResult.outAmount == null){
-            sendMessageToClient(user.telegramID, 'transfer_failed_non_swapable');
+            await sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
             console.log('Deposit made, but not swappable token');
             return;
         }
@@ -91,7 +91,7 @@ const parseUserTx = async (txData) => {
         user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
         await user.save();
 
-        await sendMessageToClient( user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
+        await sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, tokenMint);
 
         console.log('Transfer successed', transferResult.transferSignature);
 
@@ -131,18 +131,18 @@ const parseUserTx = async (txData) => {
             return;
         }
 
-        await sendMessageToClient(user.telegramID, 'hook');
+        await sendMessageToClient(user.telegramID, 'Deposit', 'hook', amount, 'SOL');
     
         const transferResult = await tokenTransferToAdmin(SOL_MINT_ADDRESS, amount, user);
     
         if(!transferResult){
             console.log('Transfer Failed');
-            await sendMessageToClient(user.telegramID, 'transfer_failed');
+            await sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
             return;
         }
 
         if (!transferResult.transactionDatabase){
-            sendMessageToClient(user.telegramID, 'transfer_failed_database_error');
+            await sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
             console.log('Database Error');
             return;
         }
@@ -165,7 +165,7 @@ const parseUserTx = async (txData) => {
         await user.save();
 
         if(transferResult.outAmount == null){
-            await sendMessageToClient(user.telegramID, 'transfer_failed_amount_zero');
+            await sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
             console.log('Amount is zero, Transfer Failed');
             return;
         }
@@ -176,7 +176,7 @@ const parseUserTx = async (txData) => {
         transactionHistory.tx_state = TX_STATE.CONFIRMED;
         await transactionHistory.save();
 
-        await sendMessageToClient(user.telegramID, `transfer_confirmed_${user.balanceStableCoin}`);
+        await sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, tokenMint);
         console.log('Transfer successed', transferResult.transferSignature);
         const swapResult = await tokenSwap(NATIVE_MINT, amount , user); ///send swap transaction
         const swapTransactionHis = swapResult.transactionHistory;

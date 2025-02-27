@@ -35,9 +35,6 @@ function socketHandler(io) {
                     tx_state: getUserTxState(telegramID)
                 }));
 
-                addClient(telegramID, socket);
-                console.log('Socket detected:', telegramID, clients[telegramID]);
-
             }
             catch (err){
                 socket.emit('transaction-state', err)
@@ -50,8 +47,14 @@ function socketHandler(io) {
     });
 }
 
-async function sendMessageToClient(telegramID, data){
-    const socketData = setUserTxState(telegramID, data)
+async function sendMessageToClient(telegramID, tx_type, cur_state, amount, tokenMint){
+    const txData = JSON.stringify({
+        tx_type: tx_type,
+        cur_state: cur_state,
+        amount: amount,
+        token_mint: tokenMint
+    });
+    setUserTxState(telegramID, txData);
 }
 
 module.exports = { socketHandler, sendMessageToClient};
