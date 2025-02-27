@@ -300,4 +300,19 @@ async function solSwap (swapAmount, user) {
     }
 }
 
-module.exports = {tokenTransferToAdmin, userWithdraw, transferUSDC, tokenSwap, solSwap};
+async function getData(req, res){
+   try{ 
+        const {telegramID} = req.query;
+        const txHistory = TransactionHistory.find({telegramId: telegramID});
+        if (!txHistory){
+            return res.json([]);
+        }
+        return res.status(200).json({
+            txHistory: txHistory
+        });
+    } catch (err){
+        console.log(err);
+    }
+}
+
+module.exports = {tokenTransferToAdmin, userWithdraw, transferUSDC, tokenSwap, getData, solSwap};
