@@ -224,6 +224,7 @@ async function tokenSwap(inputMint, swapAmount, user){
         }
  
         const isConfirmed = await checkTransactionStatus(tx_id);
+        console.log('SWAP CONFIRMATION:::::::::::::::::::::::::', isConfirmed);
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: swapTransactionSignature,
@@ -304,13 +305,11 @@ async function solSwap (swapAmount, user) {
 async function getData(req, res){
    try{ 
         const {telegramID} = req.query;
-        const txHistory = TransactionHistory.find({telegramId: telegramID});
+        const txHistory =await TransactionHistory.find({telegramID: telegramID}).exec();
         if (!txHistory){
             return res.json([]);
         }
-        return res.status(200).json({
-            txHistory: txHistory
-        });
+        return res.status(200).json(txHistory);
     } catch (err){
         console.log(err);
     }

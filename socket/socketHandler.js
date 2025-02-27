@@ -26,7 +26,6 @@ function socketHandler(io) {
         socket.on('transaction-state', async(data) => {
             try{
                 const telegramID = data.telegramID;
-                console.log('Socket Arrived::::::', telegramID)
                 if(!telegramID){
                     return;
                 }
