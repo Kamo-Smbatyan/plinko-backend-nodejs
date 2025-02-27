@@ -74,6 +74,12 @@ const JUPITER_API_BASE_URL = {
 }
 
 let numb = 0;
+const setNum = (val) =>{
+    numb = val;
+}
+const getNum = () =>{
+    return namb;
+} 
 
 module.exports = {
     TX_STATE,
@@ -89,5 +95,7 @@ module.exports = {
     JITO_TIP_ACCOUNTS,
     JUPITER_API_BASE_URL,
     clients,
-    numb
+    numb,
+    setNum,
+    getNum,
 };
