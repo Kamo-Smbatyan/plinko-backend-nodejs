@@ -78,7 +78,7 @@ const setNum = (val) =>{
     numb = val;
 }
 const getNum = () =>{
-    return namb;
+    return numb;
 } 
 
 module.exports = {
