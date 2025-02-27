@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const {clients, numb, getNum, setNum} = require('../config/constants');
+const {clients, numb, getNum, setNum, setUserTxState, getUserTxState} = require('../config/constants');
 // const {createWebhookAdmin} = require('../config/webhook');
 
 router.get("/events", async (req, res) => {
@@ -24,11 +24,8 @@ router.get("/events", async (req, res) => {
 });
 
 router.get('/testSSE', async (req, res) => {
-    let result;
-    let num = getNum()
-    num ++;
-    setNum(num);    
-    return res.json(getNum());
+    setUserTxState('4654153245', 'hook')   
+    return res.json(getUserTxState('4654153245'));
 })
 
 module.exports = router;
