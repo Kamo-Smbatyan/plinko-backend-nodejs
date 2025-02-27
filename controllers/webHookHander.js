@@ -16,9 +16,9 @@ const USDC_MINT = process.env.USDC_MINT;
 
 async function handleWebhook(req, res){
     const txData = req.body;
-    // console.log('User Transaction Received by Webhook:', txData);
     if (txData.length > 0){
         if(txData[0] === tempTxData){
+            console.log('Got same transaction: Ignored');
             return;
         }
         tempTxData = txData[0];

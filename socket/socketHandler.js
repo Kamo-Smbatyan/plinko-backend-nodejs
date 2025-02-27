@@ -34,6 +34,7 @@ function socketHandler(io) {
                     return;
                 }
                 addClient(telegramID, socket);
+                console.log('Socket detected:', telegramID, clients[telegramID])
             }
             catch (err){
                 socket.emit('transaction-state', err)

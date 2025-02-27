@@ -136,6 +136,7 @@ const sendBundleRequest = async (serializedTransactions) => {
 
 const checkTransactionStatus = async (signatures) => {
     try {
+        console.log('Confirming transaction....');
         const confirmation = await connection.getSignatureStatus(signatures, {searchTransactionHistory: true});
 
         return { confirmed: !confirmation.value.err, err: confirmation.value.err };

@@ -182,9 +182,9 @@ async function tokenSwap(inputMint, swapAmount, user){
             quoteResponse: quoteData,
             userPublicKey: adminWallet.publicKey.toString(),
             dynamicComputeUnitLimit: true,
-            prioritizationFeeLamports: {
-                jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
-            },
+            // prioritizationFeeLamports: {
+            //     jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
+            // },
         };
 
         const swapResponse = await axios.post(`https://api.jup.ag/swap/v1/swap`, swapRequestBody);
@@ -194,7 +194,8 @@ async function tokenSwap(inputMint, swapAmount, user){
         }
 
         const swapData = swapResponse.data;
-        
+        console.log('Quote::', swapData);
+                
         const deserializedTransaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
         deserializedTransaction.sign([adminWallet]);
         const rawTransaction = deserializedTransaction.serialize();
@@ -213,6 +214,7 @@ async function tokenSwap(inputMint, swapAmount, user){
         
         let tx_id;
         try{
+            console.log('Sending swap transaction...');
             tx_id =await connection.sendRawTransaction(rawTransaction);
         }
         catch(err){
@@ -220,7 +222,7 @@ async function tokenSwap(inputMint, swapAmount, user){
             tx_id = 0;
         }
  
-        const isConfirmed = checkTransactionStatus(tx_id);
+        const isConfirmed = await checkTransactionStatus(tx_id);
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: swapTransactionSignature,
