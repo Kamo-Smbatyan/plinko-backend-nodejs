@@ -8,6 +8,7 @@ const {createTransferInstruction} = require('@solana/spl-token');
 const { adminWallet, connection, sendSignalToFrontend, createTransactionInstructions, deserializeTransaction, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, sendBundleRequest, checkTransactionStatus, resolveAddressLookups } = require('../utils/helper');
 const {TX_STATE, TX_TYPE} = require('../config/constants');
 const TransactionHistory = require('../models/TransactionHistory');
+const {sendMessageToClient} = require('../socket/socketHandler')
 
 dotenv.config();
 
@@ -25,7 +26,7 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
         if(inputMint === SOL_MINT_ADDRESS){
             let userBalance = await connection.getBalance(new PublicKey(user.walletAddress));
             console.log(`Sol Balance ${amount / LAMPORTS_PER_SOL} ${userWallet.publicKey.toBase58()}`);
-            sendSignalToFrontend(user.telegramID, 'data: ' + 'sol' + '\n\n');
+            sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, tokenMint);
             let retrying = 0
             while (userBalance == 0){
                 delay(1000);
@@ -43,14 +44,14 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
                     lamports: userBalance
                 })
             );
-
+            
             const latestBlockhash = await connection.getLatestBlockhash();
             const versionedTransaction = await createVersionedTransaction([adminWallet, userWallet], instructions, latestBlockhash);
             
             console.log('Forwarding asset to admin wallet...');
         } else{
             //console.log(`${amount} token to ${userWallet.publicKey.toBase58()}`);
-            sendSignalToFrontend(user.telegramID, 'data: ' + `token_${amount}` + '\n\n');
+            sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, tokenMint);
             [ associatedTokenAccountForAdmin, associatedTokenAccountForUser ] = await Promise.all([
                 getAssociatedTokenAddressSync(new PublicKey(inputMint), adminWallet.publicKey),
                 getAssociatedTokenAddressSync(new PublicKey(inputMint), userWallet.publicKey),

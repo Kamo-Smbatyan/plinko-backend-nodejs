@@ -176,7 +176,7 @@ const parseUserTx = async (txData) => {
         transactionHistory.tx_state = TX_STATE.CONFIRMED;
         await transactionHistory.save();
 
-        await sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, tokenMint);
+        sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, tokenMint);
         console.log('Transfer successed', transferResult.transferSignature);
         const swapResult = await tokenSwap(NATIVE_MINT, amount , user); ///send swap transaction
         const swapTransactionHis = swapResult.transactionHistory;

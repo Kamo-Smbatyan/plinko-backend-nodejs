@@ -47,7 +47,7 @@ function socketHandler(io) {
     });
 }
 
-async function sendMessageToClient(telegramID, tx_type, cur_state, amount, tokenMint){
+function sendMessageToClient(telegramID, tx_type, cur_state, amount, tokenMint){
     const txData = JSON.stringify({
         tx_type: tx_type,
         cur_state: cur_state,
