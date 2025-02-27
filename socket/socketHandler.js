@@ -1,5 +1,6 @@
 const User = require("../models/User");
-const {clients, addClient, getClient} = require('../config/constants')
+const {clients, addClient, getClient} = require('../config/constants');
+const TransactionHistory = require("../models/TransactionHistory");
 
 function socketHandler(io) {
     io.on("connection", (socket) => {
@@ -14,7 +15,6 @@ function socketHandler(io) {
                     socket.emit("update-failed", { error: "User not found" });
                     return;
                 }
-
                 user.balanceStableCoin = Number(amount).toFixed(2);
                 await user.save();
                 socket.emit("update-success", { walletAddress, status: "updated" });
@@ -29,12 +29,18 @@ function socketHandler(io) {
                 if(!telegramID){
                     return;
                 }
-                const user = await User.findOne({telegramID: telegramID});
-                if (!user){
+                const txnHistory = await TransactionHistory.find({telegramID: telegramID});
+                if (!txnHistory){
                     return;
                 }
+
+                socket.emit('transaction-state', JSON.stringify({
+                    telegramID: telegramID,
+                }));
+
                 addClient(telegramID, socket);
-                console.log('Socket detected:', telegramID, clients[telegramID])
+                console.log('Socket detected:', telegramID, clients[telegramID]);
+
             }
             catch (err){
                 socket.emit('transaction-state', err)
@@ -47,18 +53,8 @@ function socketHandler(io) {
     });
 }
 
-function sendMessageToClient(telegramID, data){
-    try
-        {const clientTG = getClient(telegramID)
-        if(!clientTG){
-            console.log('client is not connected', telegramID);
-            return;
-        }
-        clientTG.emit('transaction-state', data);
-    }
-    catch(err){
-        console.log("Cannot send data by socket");
-    }
+async function sendMessageToClient(telegramID, data){
+    
 }
 
 module.exports = { socketHandler, sendMessageToClient};

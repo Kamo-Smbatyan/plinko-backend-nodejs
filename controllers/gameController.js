@@ -1,11 +1,14 @@
-const GameHistory = require("../models/GameHistory");
 
-async function placeBet(req, res) {
-  const { telegramId, betAmount, winAmount } = req.body;
-
-  const game = new GameHistory({ telegramId, betAmount, winAmount });
-  await game.save();
-  res.json({ message: "Bet placed", game });
+async function getData(req, res){
+  const {telegramID} = req.body;
+  if (!telegramID){
+    return; 
+  }
+  const txHistory = TransactionHistory.find({telegramID: telegramID});
+  if (!txHistory){
+    return;
+  }
+  return res.json(txHistory);
 }
 
 module.exports = { placeBet };

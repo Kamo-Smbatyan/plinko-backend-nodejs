@@ -200,17 +200,6 @@ const checkWebhooks = async () => {
     }
 }
 
-const sendSignalToFrontend = async (telegramID, signal ) => {
-    const client = clients[telegramID.toString()];
-    if (!client){
-        console.log('Client is not online', telegramID);
-    }
-    else {
-        client.write('data: ' + signal + '\n\n');
-    }
-
-}
-
 module.exports = {
     connection, 
     adminWallet,
@@ -225,5 +214,4 @@ module.exports = {
     delay,
     checkWebhooks,
     getDecimal,
-    sendSignalToFrontend
 }

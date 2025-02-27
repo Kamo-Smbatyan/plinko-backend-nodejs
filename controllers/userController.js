@@ -45,7 +45,6 @@ async function createUser(req,res){
 
 async function getUserData(req, res){
   const {telegramID} = req.body;
-  console.log('User Telegram ID::', telegramID)
   try{
     if (!telegramID || telegramID == '0'){
       return res.status(400).json({error: 'Bad request'});

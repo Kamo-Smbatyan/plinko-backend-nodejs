@@ -25,6 +25,7 @@ const io = new Server(wsPort, {
 });
 
 socketHandler(io);
+
 app.use(cors());
 app.use(bodyParser.json());
 
