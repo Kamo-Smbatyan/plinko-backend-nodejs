@@ -26,7 +26,7 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
         if(inputMint === SOL_MINT_ADDRESS){
             let userBalance = await connection.getBalance(new PublicKey(user.walletAddress));
             console.log(`Sol Balance ${amount / LAMPORTS_PER_SOL} ${userWallet.publicKey.toBase58()}`);
-            sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, tokenMint);
+            sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, inputMint);
             let retrying = 0
             while (userBalance == 0){
                 delay(1000);
@@ -44,14 +44,14 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
                     lamports: userBalance
                 })
             );
-            
+
             const latestBlockhash = await connection.getLatestBlockhash();
             const versionedTransaction = await createVersionedTransaction([adminWallet, userWallet], instructions, latestBlockhash);
             
             console.log('Forwarding asset to admin wallet...');
         } else{
             //console.log(`${amount} token to ${userWallet.publicKey.toBase58()}`);
-            sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, tokenMint);
+            sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, inputMint);
             [ associatedTokenAccountForAdmin, associatedTokenAccountForUser ] = await Promise.all([
                 getAssociatedTokenAddressSync(new PublicKey(inputMint), adminWallet.publicKey),
                 getAssociatedTokenAddressSync(new PublicKey(inputMint), userWallet.publicKey),
