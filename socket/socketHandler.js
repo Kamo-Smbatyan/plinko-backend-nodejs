@@ -40,6 +40,28 @@ function socketHandler(io) {
             }
         });
 
+        socket.on('transaction-state-completed', async (data) =>{
+            try{
+                const telegramID = data.telegramID;
+                if(!telegramID){
+                    return;
+                }
+                const user = User.findOne({telegramID: telegramID});
+                if(!user){
+                    return;
+                }
+
+                socket.emit('updated-balance', JSON.stringify({
+                    telegramID: telegramID,
+                    balance: user.balanceStableCoin
+                }));
+
+            }
+            catch (err){
+                socket.emit('transaction-state', err)
+            }
+        });
+
         socket.on("disconnect", () => {
             console.log(`❌ Client disconnected: ${socket.id}`);
         });

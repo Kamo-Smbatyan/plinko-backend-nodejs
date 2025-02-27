@@ -104,7 +104,7 @@ async function userWithdraw(req, res){
     if(!user){
         return res.status(500).json({message:'Wallet address not found'});
     }
-    if (user.balanceStableCoin < amount){
+    if (user.balanceStableCoin *0.975 < amount){
         res.status(400).json({message: 'Not enough balance'});
     }
     
@@ -114,10 +114,32 @@ async function userWithdraw(req, res){
             message: 'Transaction failed'
         });
     }
+    sendMessageToClient(user.telegramID, "Withdraw", "sent", amount.toString(),USDC_MINT);
 
+    const isConfirmed = await checkTransactionStatus(result);
+    const transactionHistory = new TransactionHistory({
+        telegramID: user.telegramID,
+        signature:result,
+        mintAddress:USDC_MINT,
+        inAmount: amount,
+        tx_type: "Withdraw",
+        tx_state: "sent",
+        outAmount: amount,
+        created_at: Date().now(),
+        updated_at: Date.now()
+    });
+
+    await transactionHistory.save();
+
+    if (!isConfirmed){
+        transactionHistory.tx_state = "confirmed";
+        sendMessageToClient(user.telegramID, "Withdraw", "confirmed", amount.toString(),USDC_MINT);
+    }
+    
     user.balanceStableCoin -= amount;
     await user.save();
 
+    sendMessageToClient(user.telegramID, "Withdraw", "updated", amount.toString(),USDC_MINT);
     return res.status(200).json({
         balance: user.balanceStableCoin,
         transaction: result
@@ -148,8 +170,6 @@ async function transferUSDC(sender, receiver, amount, mint){
 
     instructions.push(createTransferInstruction(senderATA, receiverATA, adminWallet.publicKey, amount));
     const versionedTransaction = await createVersionedTransaction(signers, instructions, latestBlockhash);
-    
-    let success = false;
 
     const signature = await connection.sendRawTransaction(versionedTransaction.serialize(), signers);
 
@@ -305,7 +325,7 @@ async function solSwap (swapAmount, user) {
 async function getData(req, res){
    try{ 
         const {telegramID} = req.query;
-        const txHistory =await TransactionHistory.find({telegramID: telegramID}).exec();
+        const txHistory =await TransactionHistory.find({telegramID: telegramID, tx_type: { $in: ['Withdraw', 'Deposit'] }}).exec();
         if (!txHistory){
             return res.json([]);
         }
