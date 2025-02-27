@@ -1,5 +1,5 @@
 const User = require("../models/User");
-const {clients, addClient, getClient, numb} = require('../config/constants');
+const {clients, addClient, getClient, numb, setUserTxState, getUserTxState} = require('../config/constants');
 const TransactionHistory = require("../models/TransactionHistory");
 
 function socketHandler(io) {
@@ -26,17 +26,13 @@ function socketHandler(io) {
         socket.on('transaction-state', async(data) => {
             try{
                 const telegramID = data.telegramID;
-                socket.emit('trasaction-state', numb.toString());
+
                 if(!telegramID){
                     return;
                 }
-                const txnHistory = await TransactionHistory.find({telegramID: telegramID});
-                if (!txnHistory){
-                    return;
-                }
-
                 socket.emit('transaction-state', JSON.stringify({
                     telegramID: telegramID,
+                    tx_state: getUserTxState(telegramID)
                 }));
 
                 addClient(telegramID, socket);
@@ -55,7 +51,7 @@ function socketHandler(io) {
 }
 
 async function sendMessageToClient(telegramID, data){
-    
+    const socketData = setUserTxState(telegramID, data)
 }
 
 module.exports = { socketHandler, sendMessageToClient};

@@ -14,6 +14,14 @@ const TX_TYPE = {
     WIDRAW: 'withdraw',
 }
 
+const USER_TX_STATE = []
+const setUserTxState = (telegramID, data) =>{
+     USER_TX_STATE[telegramID] = data
+}
+const getUserTxState = (telegramID) => {
+    return USER_TX_STATE[telegramID];
+}
+
 let clients = [];
 
 function addClient(telegramID, ws){
@@ -98,4 +106,6 @@ module.exports = {
     numb,
     setNum,
     getNum,
+    setUserTxState,
+    getUserTxState
 };
