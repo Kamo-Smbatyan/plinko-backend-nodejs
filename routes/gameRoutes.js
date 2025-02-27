@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const {clients} = require('../config/constants');
+const {clients, numb} = require('../config/constants');
 // const {createWebhookAdmin} = require('../config/webhook');
 
 router.get("/events", async (req, res) => {
@@ -25,13 +25,10 @@ router.get("/events", async (req, res) => {
 
 router.get('/testSSE', async (req, res) => {
     let result;
-    if (clients.length > 0){
-        clients[0].write('data: ' + 'Success' + '\n\n');
-        result = true
-    }
-    else(
-        result= false
-    )
+    numb++ ;
+    
+        result= numb
+    
     return res.json(result);
 })
 

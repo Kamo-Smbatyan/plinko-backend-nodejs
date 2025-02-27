@@ -4,7 +4,7 @@ const {createWebhookUser, createWebhookAdmin, getWebhooks, editWebhookUser, edit
 const dotenv = require('dotenv');
 const { AccountLayout, } = require('@solana/spl-token');
 const axios = require('axios');
-const {clients} =  require('../config/constants');
+
 const WEBHOOK_ID = require('../config/constants');
 const { JITO_TIP_ACCOUNTS, JITO_ENDPOINTS } = require('../config/constants');
 

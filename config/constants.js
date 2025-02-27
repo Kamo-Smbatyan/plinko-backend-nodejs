@@ -73,6 +73,8 @@ const JUPITER_API_BASE_URL = {
     SWAP: 'https://api.jup.ag/swap/v1/swap/',
 }
 
+let numb = 0;
+
 module.exports = {
     TX_STATE,
     TX_TYPE,
@@ -86,5 +88,6 @@ module.exports = {
     JITO_ENDPOINTS,
     JITO_TIP_ACCOUNTS,
     JUPITER_API_BASE_URL,
-    clients
+    clients,
+    numb
 };
