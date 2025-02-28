@@ -245,11 +245,12 @@ async function tokenSwap(inputMint, swapAmount, user){
         }
         catch(err){
             console.log('Swap error on rpc');
-            tx_id = 0;
+            tx_id = '';
         }
- 
+        if(tx_id != ''){
+            tx_id = bs58.encode(Buffer.from(tx_id));
+        }
         const isConfirmed = await checkTransactionStatus(tx_id);
-        console.log('SWAP CONFIRMATION:::::::::::::::::::::::::', isConfirmed);
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
             signature: swapTransactionSignature,
