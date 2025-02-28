@@ -3,7 +3,7 @@ const User = require("../models/schema/User");
 const {tokenTransferToAdmin, tokenSwap} = require('./transactionController');
 const { getDecimal, checkTransactionStatus } = require('../utils/helper');
 const { NATIVE_MINT, transfer } = require("@solana/spl-token");
-const { TX_STATE, TX_TYPE, SOL_MINT_ADDRESS, USDC_MINT } = require('../config/constants');
+const { TX_STATE, TX_TYPE, SOL_MINT_ADDRESS, USDC_MINT, USDC_MINT_ADDRESS } = require('../config/constants');
 const { sendMessageToClient } = require("../socket/service");
 const {newTransactionHistory,  findByIdAndUpdateTransaction, updateTransactionStatus} = require("../models/model/TransactionModel");
 
@@ -79,7 +79,6 @@ const parseUserTx = async (txData) => {
             return;
         }
         
-       
         if(transferResult.outAmount == null){
             await findByIdAndUpdateTransaction(_id, {
                 $set: {
@@ -114,7 +113,9 @@ const parseUserTx = async (txData) => {
             });
         }
         await sendMessageToClient(user.telegramID, `You have been deposit the token ${tokenMint} with ${amount} and it confirmed. It will swap with USDC soon.`);
-
+        if (tokenMint == USDC_MINT_ADDRESS){
+            return;
+        }
         /////////////token swap//////////////
         const swapResult = await tokenSwap(tokenMint, amount * (10 ** decimals), user);
         if (!swapResult){
@@ -164,7 +165,7 @@ const parseUserTx = async (txData) => {
             return;
         }
         
-        if (amount < 50000){
+        if (amount < 100000){
             console.log(`Deposit amount is too small: ${amount}`);
             await sendMessageToClient(user.telegramID, `Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
             return;

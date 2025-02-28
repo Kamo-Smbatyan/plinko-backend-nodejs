@@ -3,11 +3,11 @@ const transactionHistorySchema = new mongoose.Schema(
   {
     telegramID: {type: String, required:true, index:true},
     deposit:{
-      transaction:{type:String, required: true},
-      fromAddress: { type:String, required: true },
-      mintAddress: {type: String, required: true},
-      amount: { type: Number, required: true },
-      status: { type: String, enum: ["pending", "failed", "successful"], required: true},
+      transaction:{type:String},
+      fromAddress: { type:String },
+      mintAddress: {type: String},
+      amount: { type: Number},
+      status: { type: String, enum: ["pending", "failed", "successful"]},
       timeStamp: { type: Date, default: Date.now }
     },
     forward: {
@@ -17,11 +17,18 @@ const transactionHistorySchema = new mongoose.Schema(
       timeStamp: {type: Date}
     },
     swap: {
-      transactionID: {type:String},
+      transaction: {type:String},
       amountIn: {type:Number},
       amountOut: { type: Number},
       status: { type: String, enum: ['pending', 'failed', 'successful'], default: 'pending'},
       typeStamp: { type:Date}
+    },
+    withdraw: {
+      transaction: {type: String},
+      amount: {type: Number},
+      toAddress: {type: String},
+      timeStamp: {type: Date},
+      status: { type: String, enum: ['pending', 'failed', 'successful'], default: 'pending'},
     },
     created_at:{type: String, required: true}
   }

@@ -1,3 +1,4 @@
+const TransactionHistory = require("../models/schema/TransactionHistory");
 const User = require("../models/schema/User");
 const { createSocketServer } = require("./socket");
 
@@ -20,7 +21,8 @@ const startSocketService = (app) => {
     });
   });
 
-  watchUserBalanceUpdates()
+  watchUserBalanceUpdates();
+  watchTransactionHistoryTableUpdates();
 };
 
 const userBalanceUpdate = async (data) => {
@@ -56,14 +58,14 @@ const watchUserBalanceUpdates = () => {
     .on("change", async (change) => {
       try {
         const { documentKey, updateDescription } = change;
-        const telegramID = documentKey._id;
+        const _id = documentKey._id;
 
         // Fetch the updated user data
-        const user = await User.findById(telegramID);
+        const user = await User.findById(_id);
         if (!user) return;
 
         // Emit socket event with updated balance
-        socketIO.emit("transaction-state", JSON.stringify({
+        socketIO.emit("updated-balance", JSON.stringify({
           telegramID: user.telegramID,
           balance: user.balanceStableCoin
         }));
@@ -76,6 +78,24 @@ const watchUserBalanceUpdates = () => {
       console.error("MongoDB Change Stream Error:", err);
     });
 };
+
+const watchTransactionHistoryTableUpdates = () => {
+  TransactionHistory.watch().on("change", async (change) => {
+    try{
+      const {documentKey, operationType, fullDocument} = change;
+      const _id = documentKey._id;
+      const transactionHistory = await TransactionHistory.findById(_id);
+      if (!transactionHistory) return;
+      socketIO.emit('transaction-history', JSON.stringify({
+        telegramID: transactionHistory.telegramID,
+        change: operationType,
+        document: fullDocument,
+      }));
+    } catch (err){
+      console.error('Error in transaction history change watch', err);
+    }
+  })
+}
 
 const sendMessageToClient = async (telegramID, msg) => {
   socketIO.emit('notification', JSON.stringify({

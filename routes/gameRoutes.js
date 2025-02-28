@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {clients, numb, getNum, setNum, setUserTxState, getUserTxState} = require('../config/constants');
+const { newTransactionHistory } = require("../models/model/TransactionModel");
 // const {createWebhookAdmin} = require('../config/webhook');
 
 router.get("/events", async (req, res) => {
@@ -24,8 +25,20 @@ router.get("/events", async (req, res) => {
 });
 
 router.get('/testSSE', async (req, res) => {
-    setUserTxState('4654153245', 'hook')   
-    return res.json(getUserTxState('4654153245'));
+    let txHistoryData = {
+        telegramID: "7394315902",
+        withdraw:{
+            transaction: 'afsdafafadfasdfsadfasf',
+            amount: 0.5,
+            toAddress: 'afdssafadfadfsadfasdfdsfsdafafd',
+            timeStamp: Date.now(),
+            status: 'pending'
+        },
+        created_at: Date.now(),
+    }   
+    const txHistory = await newTransactionHistory(txHistoryData);
+    return res.json('Success');
+    //await txHistory.save();
 });
 
 module.exports = router;
