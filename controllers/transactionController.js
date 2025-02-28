@@ -125,7 +125,7 @@ async function userWithdraw(req, res){
         tx_type: "Withdraw",
         tx_state: "sent",
         outAmount: amount,
-        created_at: Date().now(),
+        created_at: Date.now(),
         updated_at: Date.now()
     });
 
@@ -147,33 +147,38 @@ async function userWithdraw(req, res){
 }
 
 async function transferUSDC(sender, receiver, amount, mint){
-    const [ senderATA, receiverATA ] = await Promise.all([
-        getAssociatedTokenAddressSync(new PublicKey(mint), sender.publicKey),
-        getAssociatedTokenAddressSync(new PublicKey(mint), new PublicKey(receiver)),
-    ]);
-    const instructions = [];
-    
-    if(!(await checkTokenAccountExistence(receiverATA))) {
-        instructions.push(createAssociatedTokenAccountInstruction(adminWallet.publicKey, receiverATA, new PublicKey(receiver), new PublicKey(mint)));
-    }
-    const [ tokenBalance, latestBlockhash ] = await Promise.all([
-        getTokenBalance(senderATA),
-        connection.getLatestBlockhash()
-    ]);
-    
-    if(tokenBalance < amount) {
+    try{
+        const [ senderATA, receiverATA ] = await Promise.all([
+            getAssociatedTokenAddressSync(new PublicKey(mint), sender.publicKey),
+            getAssociatedTokenAddressSync(new PublicKey(mint), new PublicKey(receiver)),
+        ]);
+        const instructions = [];
+        
+        if(!(await checkTokenAccountExistence(receiverATA))) {
+            instructions.push(createAssociatedTokenAccountInstruction(adminWallet.publicKey, receiverATA, new PublicKey(receiver), new PublicKey(mint)));
+        }
+        const [ tokenBalance, latestBlockhash ] = await Promise.all([
+            getTokenBalance(senderATA),
+            connection.getLatestBlockhash()
+        ]);
+        
+        if(tokenBalance < amount) {
+            return;
+        }
+
+        const signers = (sender === adminWallet) ? [adminWallet] : [adminWallet, sender] ;
+        console.log(signers.length);
+
+        instructions.push(createTransferInstruction(senderATA, receiverATA, adminWallet.publicKey, amount));
+        const versionedTransaction = await createVersionedTransaction(signers, instructions, latestBlockhash);
+
+        const signature = await connection.sendRawTransaction(versionedTransaction.serialize(), signers);
+
+        return signature;
+    } catch(err){
+        console.log("Withdraw Error", err);
         return;
     }
-
-    const signers = (sender === adminWallet) ? [adminWallet] : [adminWallet, sender] ;
-    console.log(signers.length);
-
-    instructions.push(createTransferInstruction(senderATA, receiverATA, adminWallet.publicKey, amount));
-    const versionedTransaction = await createVersionedTransaction(signers, instructions, latestBlockhash);
-
-    const signature = await connection.sendRawTransaction(versionedTransaction.serialize(), signers);
-
-    return signature;
 }
 
 async function tokenSwap(inputMint, swapAmount, user){
