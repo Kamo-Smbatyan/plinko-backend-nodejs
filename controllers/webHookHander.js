@@ -46,7 +46,6 @@ const parseUserTx = async (txData) => {
     if(txData.tokenTransfers.length > 0){
         const tokenTransfer = txData.tokenTransfers[0];
         const receiver = tokenTransfer.toUserAccount;
-
         
         const user = await User.findOne({ walletAddress: receiver });
         if (!user){
@@ -65,7 +64,7 @@ const parseUserTx = async (txData) => {
 
         if(!transferResult || !transferResult.transferSignature){
             console.log('Transfer Failed');
-            await sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
+            sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
             return;
         }        
 
@@ -83,7 +82,7 @@ const parseUserTx = async (txData) => {
 
         await transactionHistory.save();
         if(transferResult.outAmount == null){
-            await sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
+            sendMessageToClient(user.telegramID, 'Deposit', 'failed', amount, tokenMint);
             console.log('Deposit made, but not swappable token');
             return;
         }
@@ -113,6 +112,7 @@ const parseUserTx = async (txData) => {
         }
         transactionHistory.updated_at = Date.now();
         await transactionHistory.save();
+        sendMessageToClient(user.telegramID, 'Deposit', 'updated', amount, tokenMint);
         return;
     } else if (txData.nativeTransfers.length > 0){
         const nativeTransfer = txData.nativeTransfers[0];
@@ -187,11 +187,14 @@ const parseUserTx = async (txData) => {
         if (swapResult.isConfirmed){
             swapTransactionHis.tx_state = TX_STATE.CONFIRMED;
             swapTransactionHis.updated_at = Date.now();
-            console.log('Swapped successfully')
+            await swapTransactionHis.save()
+            console.log('Swapped successfully');
+            sendMessageToClient(user.telegramID, 'Deposit', 'updated', amount, tokenMint);
         }
         else{
             swapTransactionHis.tx_state = TX_STATE.SENT;
             swapTransactionHis.updated_at = Date.now();
+            await swapTransactionHis.save();
             console.log('Swap transaction sent, but not confirmed');
         }
     }

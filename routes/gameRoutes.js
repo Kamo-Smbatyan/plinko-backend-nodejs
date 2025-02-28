@@ -26,6 +26,6 @@ router.get("/events", async (req, res) => {
 router.get('/testSSE', async (req, res) => {
     setUserTxState('4654153245', 'hook')   
     return res.json(getUserTxState('4654153245'));
-})
+});
 
 module.exports = router;

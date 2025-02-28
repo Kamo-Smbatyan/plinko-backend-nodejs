@@ -4,7 +4,7 @@ const TransactionHistory = require("../models/TransactionHistory");
 
 function socketHandler(io) {
     io.on("connection", (socket) => {
-        console.log(`🔗 Client connected: ${socket.id}`);
+        // console.log(`🔗 Client connected: ${socket.id}`);
         socket.on("update-balance", async (data) => {
             try {
                 const walletAddress = data.walletAddress;
@@ -33,7 +33,7 @@ function socketHandler(io) {
                     telegramID: telegramID,
                     tx_state: getUserTxState(telegramID)
                 }));
-
+                console.log(getUserTxState(telegramID));
             }
             catch (err){
                 socket.emit('transaction-state', err)
@@ -46,7 +46,7 @@ function socketHandler(io) {
                 if(!telegramID){
                     return;
                 }
-                const user = User.findOne({telegramID: telegramID});
+                const user = await User.findOne({telegramID: telegramID});
                 if(!user){
                     return;
                 }
@@ -55,7 +55,6 @@ function socketHandler(io) {
                     telegramID: telegramID,
                     balance: user.balanceStableCoin
                 }));
-
             }
             catch (err){
                 socket.emit('transaction-state', err)

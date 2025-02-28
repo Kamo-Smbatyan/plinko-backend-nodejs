@@ -110,10 +110,12 @@ async function userWithdraw(req, res){
     
     const result = await transferUSDC(adminWallet, receiverWallet, amount * 0.975 * (10**6), USDC_MINT);
     if (!result){
+        console.log("Withraw failed.");
         return res.status(400).json({
             message: 'Transaction failed'
         });
     }
+
     sendMessageToClient(user.telegramID, "Withdraw", "sent", amount.toString(),USDC_MINT);
 
     const isConfirmed = await checkTransactionStatus(result);
@@ -122,8 +124,8 @@ async function userWithdraw(req, res){
         signature:result,
         mintAddress:USDC_MINT,
         inAmount: amount,
-        tx_type: "Withdraw",
-        tx_state: "sent",
+        tx_type: TX_TYPE.DEPOSIT,
+        tx_state: TX_STATE.SENT,
         outAmount: amount,
         created_at: Date.now(),
         updated_at: Date.now()
@@ -140,6 +142,7 @@ async function userWithdraw(req, res){
     await user.save();
 
     sendMessageToClient(user.telegramID, "Withdraw", "updated", amount.toString(),USDC_MINT);
+    console.log('Withdraw succeed.');
     return res.status(200).json({
         balance: user.balanceStableCoin,
         transaction: result
@@ -253,7 +256,7 @@ async function tokenSwap(inputMint, swapAmount, user){
         const isConfirmed = await checkTransactionStatus(tx_id);
         const transactionHistory = new TransactionHistory({
             telegramID: user.telegramID,
-            signature: swapTransactionSignature,
+            signature: bs58.encode(Buffer.from(swapTransactionSignature)),
             mintAddress: USDC_MINT,
             tx_type: TX_TYPE.SWAP,
             tx_state: TX_STATE.SENT,
@@ -331,7 +334,7 @@ async function solSwap (swapAmount, user) {
 async function getData(req, res){
    try{ 
         const {telegramID} = req.query;
-        const txHistory =await TransactionHistory.find({telegramID: telegramID, tx_type: { $in: ['Withdraw', 'Deposit'] }}).exec();
+        const txHistory =await TransactionHistory.find({telegramID: telegramID, tx_type: { $in: ['withdraw', 'deposit'] }}).exec();
         if (!txHistory){
             return res.json([]);
         }
