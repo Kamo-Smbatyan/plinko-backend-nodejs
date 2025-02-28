@@ -1,4 +1,4 @@
-const User = require("../models/User");
+const User = require("../models/schema/User");
 const {Keypair} = require('@solana/web3.js');
 const WEBHOOK_ID = require('./constants');
 const dotenv = require('dotenv');

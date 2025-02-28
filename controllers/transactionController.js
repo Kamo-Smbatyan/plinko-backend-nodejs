@@ -1,19 +1,12 @@
-const { Transaction, Keypair, PublicKey,  LAMPORTS_PER_SOL, SystemProgram, VersionedTransaction, VersionedMessage} = require('@solana/web3.js');
+const { Keypair, PublicKey,  LAMPORTS_PER_SOL, SystemProgram, VersionedTransaction} = require('@solana/web3.js');
 const { getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, NATIVE_MINT } = require('@solana/spl-token');
-const User = require('../models/User');
 const dotenv = require('dotenv');
 const bs58 = require('bs58');
 const axios = require('axios');
 const {createTransferInstruction} = require('@solana/spl-token');
 const { adminWallet, connection, sendSignalToFrontend, createTransactionInstructions, deserializeTransaction, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, sendBundleRequest, checkTransactionStatus, resolveAddressLookups } = require('../utils/helper');
-const {TX_STATE, TX_TYPE} = require('../config/constants');
-const TransactionHistory = require('../models/TransactionHistory');
-const {sendMessageToClient} = require('../socket/socketHandler')
-
-dotenv.config();
-
-const SOL_MINT_ADDRESS='So11111111111111111111111111111111111111112';
-const USDC_MINT=process.env.USDC_MINT;
+const { TX_STATE, TX_TYPE, SOL_MINT_ADDRESS, USDC_MINT_ADDRESS } = require('../config/constants');
+const {sendMessageToClient} = require('../socket/service')
 
 const tokenTransferToAdmin = async (inputMint, amount, user) => {
     try {
@@ -51,7 +44,6 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
             console.log('Forwarding asset to admin wallet...');
         } else{
             //console.log(`${amount} token to ${userWallet.publicKey.toBase58()}`);
-            sendMessageToClient(user.telegramID, 'Deposit', 'sent', amount, inputMint);
             [ associatedTokenAccountForAdmin, associatedTokenAccountForUser ] = await Promise.all([
                 getAssociatedTokenAddressSync(new PublicKey(inputMint), adminWallet.publicKey),
                 getAssociatedTokenAddressSync(new PublicKey(inputMint), userWallet.publicKey),
@@ -81,7 +73,7 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
         
         let outAmount = null;
         try{
-            const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT}&amount=${Math.floor(tokenBalance)}&slippageBps=30`);
+            const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT_ADDRESS}&amount=${Math.floor(tokenBalance)}&slippageBps=30`);
             const quoteResponseData = quoteResponse.data; 
             outAmount = quoteResponseData.outAmount;
             return {transferSignature, outAmount}
@@ -108,7 +100,7 @@ async function userWithdraw(req, res){
         res.status(400).json({message: 'Not enough balance'});
     }
     
-    const result = await transferUSDC(adminWallet, receiverWallet, amount * 0.975 * (10**6), USDC_MINT);
+    const result = await transferUSDC(adminWallet, receiverWallet, amount * 0.975 * (10**6), USDC_MINT_ADDRESS);
     if (!result){
         console.log("Withraw failed.");
         return res.status(400).json({
@@ -116,13 +108,13 @@ async function userWithdraw(req, res){
         });
     }
 
-    sendMessageToClient(user.telegramID, "Withdraw", "sent", amount.toString(),USDC_MINT);
+    sendMessageToClient(user.telegramID, "Withdraw", "sent", amount.toString(),USDC_MINT_ADDRESS);
 
     const isConfirmed = await checkTransactionStatus(result);
     const transactionHistory = new TransactionHistory({
         telegramID: user.telegramID,
         signature:result,
-        mintAddress:USDC_MINT,
+        mintAddress:USDC_MINT_ADDRESS,
         inAmount: amount,
         tx_type: TX_TYPE.DEPOSIT,
         tx_state: TX_STATE.SENT,
@@ -135,13 +127,13 @@ async function userWithdraw(req, res){
 
     if (!isConfirmed){
         transactionHistory.tx_state = "confirmed";
-        sendMessageToClient(user.telegramID, "Withdraw", "confirmed", amount.toString(),USDC_MINT);
+        sendMessageToClient(user.telegramID, "Withdraw", "confirmed", amount.toString(),USDC_MINT_ADDRESS);
     }
     
     user.balanceStableCoin -= amount;
     await user.save();
 
-    sendMessageToClient(user.telegramID, "Withdraw", "updated", amount.toString(),USDC_MINT);
+    sendMessageToClient(user.telegramID, "Withdraw", "updated", amount.toString(),USDC_MINT_ADDRESS);
     console.log('Withdraw succeed.');
     return res.status(200).json({
         balance: user.balanceStableCoin,
@@ -197,7 +189,7 @@ async function tokenSwap(inputMint, swapAmount, user){
         }
         
         console.log('Swapping', swapAmount, adminWalletTokenBalance);
-        const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
+        const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT_ADDRESS}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
 
         const quoteData = quoteResponse.data;
 
@@ -223,7 +215,6 @@ async function tokenSwap(inputMint, swapAmount, user){
         }
 
         const swapData = swapResponse.data;
-        console.log('Quote::', swapData);
                 
         const deserializedTransaction = VersionedTransaction.deserialize(Buffer.from(swapData.swapTransaction, 'base64'));
         deserializedTransaction.sign([adminWallet]);
@@ -244,29 +235,17 @@ async function tokenSwap(inputMint, swapAmount, user){
         let tx_id;
         try{
             console.log('Sending swap transaction...');
-            tx_id =await connection.sendRawTransaction(rawTransaction);
-        }
-        catch(err){
+            tx_id = await connection.sendRawTransaction(rawTransaction);
+        } catch(err){
             console.log('Swap error on rpc');
             tx_id = '';
         }
+
         if(tx_id != ''){
             tx_id = bs58.encode(Buffer.from(tx_id));
         }
         const isConfirmed = await checkTransactionStatus(tx_id);
-        const transactionHistory = new TransactionHistory({
-            telegramID: user.telegramID,
-            signature: bs58.encode(Buffer.from(swapTransactionSignature)),
-            mintAddress: USDC_MINT,
-            tx_type: TX_TYPE.SWAP,
-            tx_state: TX_STATE.SENT,
-            inAmount: swapAmount/(10**6),
-            outAmount: outAmount,
-            created_at: Date.now(),
-            updated_at: Date.now()
-        });
-
-        await transactionHistory.save();
+        
         // let isSent = false;
         // let retry = 0
         // while(!isSent) {
@@ -313,7 +292,6 @@ async function tokenSwap(inputMint, swapAmount, user){
         return { 
             tx_id, 
             outAmount,
-            transactionHistory,
             isConfirmed,
         };
     } catch(err) {

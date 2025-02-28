@@ -1,11 +1,11 @@
 const dotenv = require('dotenv')
-
 dotenv.config();
 
 const TX_STATE = {
-    SENT: 'sent',
-    FAILED: 'failed',
-    CONFIRMED: 'confirmed',
+    PENDING: 'Pending',
+    SENT: 'Sent',
+    FAILED: 'Failed',
+    CONFIRMED: 'Confirmed',
 }
 
 const TX_TYPE = {
@@ -14,31 +14,19 @@ const TX_TYPE = {
     WIDRAW: 'withdraw',
 }
 
-const USER_TX_STATE = []
+const USER_TX_STATE = [];
+const USER_WEBHOOK_ID =process.env.USER_WEBHOOK_ID || null ;
+const ADMIN_WEBHOOK_ID = process.env.ADMIN_WEBHOOK_ID || null;
+const SOL_MINT_ADDRESS = process.env.SOL_MINT_ADDRESS || "";
+const USDC_MINT_ADDRESS = process.env.USDC_MINT_ADDRESS || "";
+
 const setUserTxState = (telegramID, data) =>{
      USER_TX_STATE[telegramID] = data
 }
+
 const getUserTxState = (telegramID) => {
     return USER_TX_STATE[telegramID];
 }
-
-let clients = [];
-
-function addClient(telegramID, ws){
-    clients[telegramID] = ws;
-}
-
-function removeClient(telegramID){
-    delete clients[telegramID];
-}
-
-function getClient(telegramID){
-    return clients[telegramID]
-}
-
-let USER_WEBHOOK_ID =process.env.USER_WEBHOOK_ID || null ;
-
-let ADMIN_WEBHOOK_ID = process.env.ADMIN_WEBHOOK_ID || null;
 
 function setUserWebHookID(value){
     USER_WEBHOOK_ID = value
@@ -81,14 +69,6 @@ const JUPITER_API_BASE_URL = {
     SWAP: 'https://api.jup.ag/swap/v1/swap/',
 }
 
-let numb = 0;
-const setNum = (val) =>{
-    numb = val;
-}
-const getNum = () =>{
-    return numb;
-} 
-
 module.exports = {
     TX_STATE,
     TX_TYPE,
@@ -96,16 +76,11 @@ module.exports = {
     getUserWebHookID,
     setAdminWebhookID,
     getAdminWebhookID,
-    addClient,
-    removeClient,
-    getClient,
     JITO_ENDPOINTS,
     JITO_TIP_ACCOUNTS,
     JUPITER_API_BASE_URL,
-    clients,
-    numb,
-    setNum,
-    getNum,
     setUserTxState,
-    getUserTxState
+    getUserTxState,
+    SOL_MINT_ADDRESS,
+    USDC_MINT_ADDRESS
 };

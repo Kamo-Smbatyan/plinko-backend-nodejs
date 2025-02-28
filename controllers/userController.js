@@ -1,11 +1,12 @@
 const { editWebhookUser, createWebhookUser } = require("../config/webhook");
 const WEBHOOK_ID = require('../config/constants');
 const {Keypair} = require('@solana/web3.js');
-const User = require("../models/User");
+const User = require("../models/schema/User");
 const bs58 = require('bs58');
 
 async function checkUserByTelegram(req, res){
-  const {telegramID} = req.body;
+  const { telegramID } = req.body;
+
   if(!telegramID){
     return res.status(400).json({error: 'failed'})
   }
