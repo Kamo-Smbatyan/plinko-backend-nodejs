@@ -5,7 +5,6 @@ const bodyParser = require("body-parser");
 
 const { checkWebhooks } = require('./utils/helper');
 const userRoutes = require("./routes/userRoutes");
-const gameRoutes = require("./routes/gameRoutes");
 const webHookRouter = require('./routes/webHookRouter');
 const transactionRouter = require('./routes/transactionRoutes');
 const { startSocketService } = require("./socket/service");
@@ -23,7 +22,6 @@ app.use(bodyParser.json());
 app.get('/', (req, res) => res.status(200).json("Server is running!"));
 
 app.use("/user", userRoutes);
-app.use("/game", gameRoutes);
 app.use('/monitor', webHookRouter);
 app.use('/transaction', transactionRouter)
 

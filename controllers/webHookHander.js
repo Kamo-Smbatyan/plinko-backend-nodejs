@@ -48,9 +48,10 @@ const parseUserTx = async (txData) => {
                 deposit: {
                     transaction: txSignature,
                     fromAddress: tokenTransfer.fromUserAccount,
-                    mintAddress: tokenTransfer.tokenMint,
+                    mintAddress: tokenMint,
                     amount: amount,
                     status: "successful",
+                    timeStamp: new Date().toISOString(),
                 },
                 created_at: new Date().toISOString(),
             };
@@ -178,9 +179,10 @@ const parseUserTx = async (txData) => {
                 deposit: {
                     transaction: txSignature,
                     fromAddress: tokenTransfer.fromUserAccount,
-                    mintAddress: tokenTransfer.tokenMint,
+                    mintAddress: SOL_MINT_ADDRESS,
                     amount: amount,
                     status: "successful",
+                    timeStamp: new Date().toISOString(),
                 },
                 created_at: new Date().toISOString(),
             };
@@ -216,12 +218,23 @@ const parseUserTx = async (txData) => {
             console.log('Transfer succeed', transferResult.transferSignature);
 
             const swapResult = await tokenSwap(SOL_MINT_ADDRESS, amount , user);
+            await findByIdAndUpdateTransaction(_id, {
+                $set: {
+                    swap:{
+                        transaction: swapResult.tx_id,
+                        amountIn: amount / LAMPORTS_PER_SOL,
+                        amountOut: swapResult.outAmount / (10 ** 6),
+                        status: 'pending',
+                        timeStamp: new Date(),
+                    },
+                },
+            });
 
             if (swapResult.isConfirmed){
                 await findByIdAndUpdateTransaction(_id, {
                     $set: {
                         swap:{
-                            transaction: transferResult.transferSignature,
+                            transaction: swapResult.tx_id,
                             amountIn: amount / LAMPORTS_PER_SOL,
                             amountOut: swapResult.outAmount / (10 ** 6),
                             status: 'successful',
@@ -250,8 +263,8 @@ const parseUserTx = async (txData) => {
             }
         }
     } catch (error){
-        console.error(error);
-        return;
+        console.log(error);
+
     }
 }
 
