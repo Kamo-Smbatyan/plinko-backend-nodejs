@@ -123,12 +123,10 @@ async function userWithdraw(req, res){
             },
             created_at: Date.now(),
         }   
-        try {
-            const txHistory = await newTransactionHistory(txHistoryData);
-        } catch (error){
-            
-        }
-        await txHistory.save()
+
+        const txHistory = await newTransactionHistory(txHistoryData);
+
+        await txHistory.save();
         const _id = txHistory._id;
         
         
