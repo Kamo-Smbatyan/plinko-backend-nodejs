@@ -104,7 +104,14 @@ const sendMessageToClient = async (telegramID, msg) => {
   }));
 }
 
+const sendErrorToClient = async (telegramID, msg) => {
+  socketIO.emit('error-notification',JSON.stringify({
+    telegramID, msg
+  }));
+}
+
 module.exports = {
   startSocketService,
-  sendMessageToClient
+  sendMessageToClient,
+  sendErrorToClient,
 }

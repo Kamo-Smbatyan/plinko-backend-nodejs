@@ -7,7 +7,7 @@ const {createTransferInstruction} = require('@solana/spl-token');
 const User = require('../models/schema/User');
 const { adminWallet, connection, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, checkTransactionStatus } = require('../utils/helper');
 const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS } = require('../config/constants');
-const {sendMessageToClient} = require('../socket/service');
+const {sendMessageToClient, sendErrorToClient} = require('../socket/service');
 const { newTransactionHistory, findByIdAndUpdateTransaction, getTransactionsByTelegramID } = require('../models/model/TransactionModel');
 
 dotenv.config();
@@ -162,12 +162,15 @@ async function userWithdraw(req, res){
 
 async function transferUSDC(sender, receiver, amount, mint){
     try{
+        const user = await User.findOne({walletAddress: sender.publicKey.toBase58()});
+        if (!user){
+            return;
+        }
         const [ senderATA, receiverATA ] = await Promise.all([
             getAssociatedTokenAddressSync(new PublicKey(mint), sender.publicKey),
             getAssociatedTokenAddressSync(new PublicKey(mint), new PublicKey(receiver)),
         ]);
         const instructions = [];
-        
         if(!(await checkTokenAccountExistence(receiverATA))) {
             instructions.push(createAssociatedTokenAccountInstruction(adminWallet.publicKey, receiverATA, new PublicKey(receiver), new PublicKey(mint)));
         }
@@ -175,8 +178,10 @@ async function transferUSDC(sender, receiver, amount, mint){
             getTokenBalance(senderATA),
             connection.getLatestBlockhash()
         ]);
-        
+        console.log(tokenBalance, amount);
         if(tokenBalance < amount) {
+            console.log('Admin wallet has no enough assets');
+            sendErrorToClient(user.telegramID, "Failed! Admin wallet has no enough assets. Please try again later");
             return;
         }
 
@@ -337,7 +342,11 @@ async function getData(req, res){
         }
         return res.status(200).json(txHistory);
     } catch (err){
-        console.log(err);
+        console.error(err);
+        return res.status(500).json({
+            error: err,
+            message: 'Withdraw failed',
+        });
     }
 }
 
