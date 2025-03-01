@@ -23,7 +23,6 @@ const getWebhooks = async () => {
     let url = `https://api.helius.xyz/v0/webhooks?api-key=${HELIUS_API_KEY}`;
     const res = await fetch(url);
     const data = await res.json();
-    console.log('Web Hook', data)
     if (Array.isArray(data) && data.length > 0) {
       return data;  // Return all webhook IDs
     } else {
@@ -87,8 +86,6 @@ const createWebhookAdmin = async () => {
       }
     );
     const data = await response.json();
-    WEBHOOK_ID.setAdminWebhookID(data.webhookID);
-    console.log('Web hook created', data)
     return data.webhookID || 'no';
   } catch (e) {
     console.error("Webhook Creation error", e);
@@ -110,7 +107,6 @@ const deleteWebhook = async (webHookID) => {
     );
     return true;
   } catch (e) {
-    console.error("delete webhook error", e);
     return false;
   }
 };

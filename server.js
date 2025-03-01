@@ -11,8 +11,6 @@ const { startSocketService } = require("./socket/service");
 
 require('./config/database');
 
-// const transactionRoutes = require("./routes/transactionRoutes");
-
 const app = express();
 
 app.use(cors());

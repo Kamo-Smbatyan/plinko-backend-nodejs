@@ -104,12 +104,13 @@ async function userWithdraw(req, res){
         }
         if (user.balanceStableCoin *0.975 < amount){
             sendMessageToClient(user.telegramID, `You have no enough balance`);
-            res.status(400).json({message: 'Not enough balance'});
+            res.status(400).json({error: 'Not enough balance', message: 'Not enough balance'});
         }
         
         const result = await transferUSDC(adminWallet, receiverWallet, amount * 0.975 * (10**6), USDC_MINT_ADDRESS);
         if (!result){
-            return;
+            sendErrorToClient(user.telegramID, 'Something went wrong. Try again later')
+            return res.status(400).json({error: "Transfer Error", message : "Transfer failed"});
         }
         let txHistoryData = {
             telegramID: user.telegramID,
@@ -157,10 +158,6 @@ async function userWithdraw(req, res){
 
 async function transferUSDC(sender, receiver, amount, mint){
     try{
-        const user = await User.findOne({walletAddress: sender.publicKey.toBase58()});
-        if (!user){
-            return;
-        }
         const [ senderATA, receiverATA ] = await Promise.all([
             getAssociatedTokenAddressSync(new PublicKey(mint), sender.publicKey),
             getAssociatedTokenAddressSync(new PublicKey(mint), new PublicKey(receiver)),
@@ -173,7 +170,7 @@ async function transferUSDC(sender, receiver, amount, mint){
             getTokenBalance(senderATA),
             connection.getLatestBlockhash()
         ]);
-        console.log(tokenBalance, amount);
+
         if(tokenBalance < amount) {
             console.log('Admin wallet has no enough assets');
             sendErrorToClient(user.telegramID, "Failed! Admin wallet has no enough assets. Please try again later");
@@ -181,7 +178,6 @@ async function transferUSDC(sender, receiver, amount, mint){
         }
 
         const signers = (sender === adminWallet) ? [adminWallet] : [adminWallet, sender] ;
-        console.log(signers.length);
 
         instructions.push(createTransferInstruction(senderATA, receiverATA, adminWallet.publicKey, amount));
         const versionedTransaction = await createVersionedTransaction(signers, instructions, latestBlockhash);
