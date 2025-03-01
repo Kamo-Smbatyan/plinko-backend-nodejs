@@ -2,10 +2,9 @@ const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const User = require("../models/schema/User");
 const {tokenTransferToAdmin, tokenSwap} = require('./transactionController');
 const { getDecimal, checkTransactionStatus } = require('../utils/helper');
-const { NATIVE_MINT, transfer } = require("@solana/spl-token");
-const { TX_STATE, TX_TYPE, SOL_MINT_ADDRESS, USDC_MINT, USDC_MINT_ADDRESS } = require('../config/constants');
-const { sendMessageToClient } = require("../socket/service");
-const {newTransactionHistory,  findByIdAndUpdateTransaction, updateTransactionStatus} = require("../models/model/TransactionModel");
+const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS } = require('../config/constants');
+const { sendMessageToClient, sendErrorToClient } = require("../socket/service");
+const {newTransactionHistory,  findByIdAndUpdateTransaction} = require("../models/model/TransactionModel");
 
 let tempTxData = '';
 
@@ -56,7 +55,7 @@ const parseUserTx = async (txData) => {
         };
         
         const txHistory = await newTransactionHistory(txHistoryData);
-        txHistory = await txHistory.save();
+        await txHistory.save();
         const _id = txHistory._id;
         
         await sendMessageToClient(user.telegramID, `You have been deposit the token ${tokenMint} with ${amount}`);
@@ -68,6 +67,7 @@ const parseUserTx = async (txData) => {
                 $set: {
                     forward:{
                         transaction: transferResult.transferSignature,
+                        mintAddress: tokenMint,
                         amount: amount,
                         status: 'failed',
                         timeStamp: new Date(),
@@ -84,6 +84,7 @@ const parseUserTx = async (txData) => {
                 $set: {
                     forward:{
                         transaction: transferResult.transferSignature,
+                        mintAddress: tokenMint,
                         amount: amount,
                         status: 'failed',
                         timeStamp: new Date(),
@@ -105,6 +106,7 @@ const parseUserTx = async (txData) => {
                 $set: {
                     forward:{
                         transaction: transferResult.transferSignature,
+                        mintAddress: tokenMint,
                         amount: amount,
                         status: 'successful',
                         timeStamp: new Date(),
@@ -139,7 +141,8 @@ const parseUserTx = async (txData) => {
                 $set: {
                     swap:{
                         transaction: transferResult.transferSignature,
-                        amount: amount,
+                        amountIn: amount,
+                        amountOut:swapResult.outAmount / (10**6),
                         status: 'successful',
                         timeStamp: new Date(),
                     },
@@ -171,24 +174,46 @@ const parseUserTx = async (txData) => {
             return;
         }
 
+        let txHistoryData = {
+            telegramID: user.telegramID,
+            deposit: {
+                transaction: txSignature,
+                fromAddress: tokenTransfer.fromUserAccount,
+                mintAddress: tokenTransfer.tokenMint,
+                amount: amount,
+                status: "successful",
+            },
+            created_at: new Date().toISOString(),
+        };
+        
+        const txHistory = await newTransactionHistory(txHistoryData);
+        await txHistory.save();
+        const _id = txHistory._id;
+
         await sendMessageToClient(user.telegramID, `You have been deposit ${amount / LAMPORTS_PER_SOL} SOL`);
 
         const transferResult = await tokenTransferToAdmin(SOL_MINT_ADDRESS, amount, user);
 
-        console.log('TRANSFER TRANSACTION RESULT', transferResult);
-
         if(!transferResult.transferSignature){
+            await findByIdAndUpdateTransaction(_id, {
+                $set: {
+                    forward:{
+                        transaction: transferResult.transferSignature,
+                        amount: amount / LAMPORTS_PER_SOL,
+                        status: 'failed',
+                        timeStamp: new Date(),
+                    },
+                },
+            });
             console.log('Transfer Failed');
-            sendMessageToClient(user.telegramID, `You have been deposit ${amount / LAMPORTS_PER_SOL} SOL but it didn't confirm.`);
-            return;
+            sendErrorToClient(user.telegramID, `You have been deposited ${amount / LAMPORTS_PER_SOL}SOL but it didn't confirm.`);
         }
 
         if(transferResult.outAmount == null){
-            await sendMessageToClient(user.telegramID, `Deposit confirmed but the amount is too small or something went wrong.`);
+            await sendErrorToClient(user.telegramID, `Deposit confirmed but the amount is too small or something went wrong.`);
             return;
         }
 
-        await sendMessageToClient(user.telegramID, `You have been deposit ${amount / LAMPORTS_PER_SOL} SOL. It will swap with USDC soon.`);
         console.log('Transfer succeed', transferResult.transferSignature);
 
         const swapResult = await tokenSwap(SOL_MINT_ADDRESS, amount , user);
@@ -198,13 +223,14 @@ const parseUserTx = async (txData) => {
                 $set: {
                     swap:{
                         transaction: transferResult.transferSignature,
-                        amount: amount,
+                        amountIn: amount / LAMPORTS_PER_SOL,
+                        amountOut: swapResult.outAmount / (10 ** 6),
                         status: 'successful',
                         timeStamp: new Date(),
                     },
                 },
             });
-            user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
+            user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6 * 0.975);
             await user.save();
             console.log('Swapped successfully');
             await sendMessageToClient(user.telegramID, `All are succeed. Your balance added ${swapResult.outAmount}. You can play!`);
@@ -213,7 +239,8 @@ const parseUserTx = async (txData) => {
                 $set: {
                     swap:{
                         transaction: transferResult.transferSignature,
-                        amount: amount,
+                        amountIn: amount / LAMPORTS_PER_SOL,
+                        amountOut: 0,
                         status: 'failed',
                         timeStamp: new Date(),
                     },
