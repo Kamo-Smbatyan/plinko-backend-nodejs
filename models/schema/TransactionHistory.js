@@ -8,19 +8,19 @@ const transactionHistorySchema = new mongoose.Schema(
       mintAddress: {type: String},
       amount: { type: Number},
       status: { type: String, enum: ["pending", "failed", "successful"]},
-      timeStamp: { type: Date, default: Date.now }
+      timeStamp: { type: Date }
     },
     forward: {
       transaction: {type:String},
       amount: {type: Number},
-      status: {type: String, enum: ['pending', 'failed', 'successful'], default: 'pending'},
+      status: {type: String, enum: ['pending', 'failed', 'successful']},
       timeStamp: {type: Date}
     },
     swap: {
       transaction: {type:String},
       amountIn: {type:Number},
       amountOut: { type: Number},
-      status: { type: String, enum: ['pending', 'failed', 'successful'], default: 'pending'},
+      status: { type: String, enum: ['pending', 'failed', 'successful']},
       typeStamp: { type:Date}
     },
     withdraw: {
@@ -28,7 +28,7 @@ const transactionHistorySchema = new mongoose.Schema(
       amount: {type: Number},
       toAddress: {type: String},
       timeStamp: {type: Date},
-      status: { type: String, enum: ['pending', 'failed', 'successful'], default: 'pending'},
+      status: { type: String, enum: ['pending', 'failed', 'successful']},
     },
     created_at:{type: String, required: true}
   }
