@@ -123,7 +123,11 @@ async function userWithdraw(req, res){
             },
             created_at: Date.now(),
         }   
-        const txHistory = await newTransactionHistory(txHistoryData);
+        try {
+            const txHistory = await newTransactionHistory(txHistoryData);
+        } catch (error){
+            
+        }
         await txHistory.save()
         const _id = txHistory._id;
         
@@ -140,7 +144,7 @@ async function userWithdraw(req, res){
                 }
             });
             sendMessageToClient(user.telegramID, ` Withdraw transaction confirming failed`);
-            return ;
+            return res.status(500).json({error:err, message:'Confirmation failed'});
         }
         
         user.balanceStableCoin -= amount;
@@ -170,10 +174,10 @@ async function transferUSDC(sender, receiver, amount, mint){
             getTokenBalance(senderATA),
             connection.getLatestBlockhash()
         ]);
-
+        console.log("token balance:",tokenBalance)
         if(tokenBalance < amount) {
             console.log('Admin wallet has no enough assets');
-            sendErrorToClient(user.telegramID, "Failed! Admin wallet has no enough assets. Please try again later");
+            //sendErrorToClient(user.telegramID, "Failed! Admin wallet has no enough assets. Please try again later");
             return;
         }
 
@@ -186,7 +190,6 @@ async function transferUSDC(sender, receiver, amount, mint){
 
         return signature;
     } catch(err){
-        console.log("Withdraw Error", err);
         return;
     }
 }
