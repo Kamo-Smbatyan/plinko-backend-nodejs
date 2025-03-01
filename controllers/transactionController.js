@@ -147,7 +147,7 @@ async function userWithdraw(req, res){
             }
         });
         sendMessageToClient(user.telegramID, ` Withdraw transaction confirming failed`);
-        return;
+        return ;
     }
     
     user.balanceStableCoin -= amount;

@@ -89,7 +89,7 @@ const watchTransactionHistoryTableUpdates = () => {
       socketIO.emit('transaction-history', JSON.stringify({
         telegramID: transactionHistory.telegramID,
         change: operationType,
-        document: fullDocument,
+        document: (change == 'insert'? fullDocument: transactionHistory),
       }));
     } catch (err){
       console.error('Error in transaction history change watch', err);
