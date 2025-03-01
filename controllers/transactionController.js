@@ -336,7 +336,7 @@ async function getData(req, res){
         console.error(err);
         return res.status(500).json({
             error: err,
-            message: 'Withdraw failed',
+            message: 'Failed to fetch transaction data',
         });
     }
 }

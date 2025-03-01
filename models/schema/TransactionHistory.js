@@ -35,12 +35,25 @@ const transactionHistorySchema = new mongoose.Schema(
 );
 
 // Ensure uniqueness by creating an index
-transactionHistorySchema.index({ 
-  "deposit.transaction": 1,
-  "forward.transaction": 1,
-  "swap.transaction": 1,
-  "withdraw.transaction": 1
-}, { unique: true });
+transactionHistorySchema.index(
+  { "deposit.transaction": 1 },
+  { unique: true, partialFilterExpression: { "deposit.transaction": { $ne: null } } }
+);
+
+transactionHistorySchema.index(
+  { "forward.transaction": 1 },
+  { unique: true, partialFilterExpression: { "forward.transaction": { $ne: null } } }
+);
+
+transactionHistorySchema.index(
+  { "swap.transaction": 1 },
+  { unique: true, partialFilterExpression: { "swap.transaction": { $ne: null } } }
+);
+
+transactionHistorySchema.index(
+  { "withdraw.transaction": 1 },
+  { unique: true, partialFilterExpression: { "withdraw.transaction": { $ne: null } } }
+);
 
 module.exports = mongoose.model("TransactionHistory", transactionHistorySchema);
 // Creating an index for better performance on frequently queried fields
