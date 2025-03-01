@@ -93,71 +93,66 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
 }
 
 async function userWithdraw(req, res){
-    const {amount, receiverWallet, senderWallet} = req.body;
-    console.log('Withdraw', senderWallet, receiverWallet, amount);
-    const user = await User.findOne({walletAddress: senderWallet});
+    try{
+        const {amount, receiverWallet, senderWallet} = req.body;
+        console.log('Withdraw', senderWallet, receiverWallet, amount);
+        const user = await User.findOne({walletAddress: senderWallet});
 
-    if(!user){
-        sendMessageToClient(user.telegramID, `Something went wrong. Please try again later`);
-        return res.status(500).json({message:'Wallet address not found'});
-    }
-    if (user.balanceStableCoin *0.975 < amount){
-        sendMessageToClient(user.telegramID, `You have no enough balance`);
-        res.status(400).json({message: 'Not enough balance'});
-    }
-    
-    const result = await transferUSDC(adminWallet, receiverWallet, amount * 0.975 * (10**6), USDC_MINT_ADDRESS);
-    let txHistoryData = {
-        telegramID: user.telegramID,
-        withdraw:{
-            transaction: result,
-            amount: amount*0.975,
-            toAddress: receiverWallet,
-            timeStamp: Date.now(),
-            status: 'pending'
-        },
-        created_at: Date.now(),
-    }   
-    const txHistory = await newTransactionHistory(txHistoryData);
-    await txHistory.save()
-    const _id = txHistory._id;
-    if (!result){
-        console.log("Withraw failed.");
-        sendMessageToClient(user.telegramID, `Failed to withraw. Try again!`);
-        await findByIdAndUpdateTransaction(_id, {
+        if(!user){
+            sendMessageToClient(user.telegramID, `Something went wrong. Please try again later`);
+            return res.status(500).json({message:'Wallet address not found'});
+        }
+        if (user.balanceStableCoin *0.975 < amount){
+            sendMessageToClient(user.telegramID, `You have no enough balance`);
+            res.status(400).json({message: 'Not enough balance'});
+        }
+        
+        const result = await transferUSDC(adminWallet, receiverWallet, amount * 0.975 * (10**6), USDC_MINT_ADDRESS);
+        if (!result){
+            return;
+        }
+        let txHistoryData = {
+            telegramID: user.telegramID,
             withdraw:{
-                status: 'failed',
+                transaction: result,
+                amount: amount*0.975,
+                toAddress: receiverWallet,
                 timeStamp: Date.now(),
-            }
-        });
-        return res.status(400).json({
-            message: 'Transaction failed'
-        });
-    }
-    
-    sendMessageToClient(user.telegramID, `You successfully withdraw ${amount} USDC. Confirming...`);
-    
-    const isConfirmed = await checkTransactionStatus(result);
+                status: 'pending'
+            },
+            created_at: Date.now(),
+        }   
+        const txHistory = await newTransactionHistory(txHistoryData);
+        await txHistory.save()
+        const _id = txHistory._id;
+        
+        
+        sendMessageToClient(user.telegramID, `You successfully withdraw ${amount} USDC. Confirming...`);
+        
+        const isConfirmed = await checkTransactionStatus(result);
 
-    if (!isConfirmed){
-        await findByIdAndUpdateTransaction(_id, {
-            withdraw:{
-                status: 'failed',
-                timeStamp: Date.now(),
-            }
-        });
-        sendMessageToClient(user.telegramID, ` Withdraw transaction confirming failed`);
-        return ;
-    }
-    
-    user.balanceStableCoin -= amount;
-    await user.save();
+        if (!isConfirmed){
+            await findByIdAndUpdateTransaction(_id, {
+                withdraw:{
+                    status: 'failed',
+                    timeStamp: Date.now(),
+                }
+            });
+            sendMessageToClient(user.telegramID, ` Withdraw transaction confirming failed`);
+            return ;
+        }
+        
+        user.balanceStableCoin -= amount;
+        await user.save();
 
-    sendMessageToClient(user.telegramID, `Withdraw succeed`);
-    console.log('Withdraw succeed.');
-    return res.status(200).json({
-        balance: user.balanceStableCoin,
-    });
+        sendMessageToClient(user.telegramID, `Withdraw succeed`);
+        console.log('Withdraw succeed.');
+        return res.status(200).json({
+            balance: user.balanceStableCoin,
+        });
+    } catch (err){
+        return res.status(500).json({error:err, message:'Withdraw failed'})
+    }
 }
 
 async function transferUSDC(sender, receiver, amount, mint){
