@@ -8,7 +8,7 @@ const User = require('../models/schema/User');
 const { adminWallet, connection, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, checkTransactionStatus } = require('../utils/helper');
 const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS } = require('../config/constants');
 const {sendMessageToClient} = require('../socket/service');
-const { newTransactionHistory, findByIdAndUpdateTransaction } = require('../models/model/TransactionModel');
+const { newTransactionHistory, findByIdAndUpdateTransaction, getTransactionsByTelegramID } = require('../models/model/TransactionModel');
 
 dotenv.config();
 
@@ -331,7 +331,7 @@ async function solSwap (swapAmount, user) {
 async function getData(req, res){
    try{ 
         const {telegramID} = req.query;
-        const txHistory =await TransactionHistory.find({telegramID: telegramID, tx_type: { $in: ['withdraw', 'deposit'] }}).exec();
+        const txHistory =await getTransactionsByTelegramID(telegramID);
         if (!txHistory){
             return res.json([]);
         }
