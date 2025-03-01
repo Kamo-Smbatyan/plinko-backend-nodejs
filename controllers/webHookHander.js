@@ -149,7 +149,7 @@ const parseUserTx = async (txData) => {
                         },
                     },
                 });
-                user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6);
+                user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6) * 0.975;
                 await user.save();
 
                 console.log('Swapped successfully');
@@ -165,12 +165,10 @@ const parseUserTx = async (txData) => {
             const user = await User.findOne({ walletAddress: receiver });
                 
             if (!user){
-                console.log('User not found');
                 return;
             }
             
             if (amount < 100000){
-                console.log(`Deposit amount is too small: ${amount}`);
                 await sendMessageToClient(user.telegramID, `Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
                 return;
             }
