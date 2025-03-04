@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const transactionHistorySchema = new mongoose.Schema({
-  telegramID: { type: String, required: true, index: true }, 
+  telegramID: { type: String, required: true}, 
   deposit: {
     transaction: { type: String }, 
     fromAddress: { type: String },
@@ -61,10 +61,10 @@ transactionHistorySchema.index(
 
 transactionHistorySchema.index(
   { "withdraw.transfer.transaction": 1 },
-  { unique: true, partialFilterExpression: { "withdraw.transaction": { $ne: null } } } // ✅ Exclude null values
+  { unique: true, partialFilterExpression: { "withdraw.transfer.transaction": { $ne: null } } } // ✅ Exclude null values
 );
 transactionHistorySchema.index(
   { "withdraw.swap.transaction": 1 },
-  { unique: true, partialFilterExpression: { "withdraw.transaction": { $ne: null } } } // ✅ Exclude null values
+  { unique: true, partialFilterExpression: { "withdraw.swap.transaction": { $ne: null } } } // ✅ Exclude null values
 );
 module.exports = mongoose.model("TransactionHistory", transactionHistorySchema);
