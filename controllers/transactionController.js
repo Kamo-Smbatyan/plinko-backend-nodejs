@@ -317,6 +317,7 @@ async function withdrawToken(receiver, tokenMint, inputAmount, user, decimals) {
                     transaction: transactionResult,
                     amount: inputAmount * TRANSACTION_FEE/(10**6),
                     toAddress: receiver,
+                    tokenMint: tokenMint,
                     timeStamp: Date.now(),
                     status: "pending"
                 },
@@ -386,6 +387,7 @@ async function withdrawToken(receiver, tokenMint, inputAmount, user, decimals) {
             });
             return false;
         }
+        console.log("Confirmed", swapResult.outAmount);
         // sendMessageToClient(user.telegramID, `Swap transaction confirmation failed. Try again later`);
         await findByIdAndUpdateTransaction(_id, {
             $set: {
@@ -394,7 +396,7 @@ async function withdrawToken(receiver, tokenMint, inputAmount, user, decimals) {
             }
         });
         
-        const transferResult = await transferToken(adminWallet, receiver, swapResult.outAmount * TRANSACTION_FEE, USDC_MINT_ADDRESS);
+        const transferResult = await transferToken(adminWallet, receiver, swapResult.outAmount * TRANSACTION_FEE, tokenMint);
         if (!transferResult){
             await sendErrorToClient(user.telegramID, `Withdraw failed. Try again later`)
             return false;
@@ -403,6 +405,7 @@ async function withdrawToken(receiver, tokenMint, inputAmount, user, decimals) {
             $set: {
                 "withdraw.transfer.transaction": transferResult,
                 "withdraw.transfer.status": "pending",
+                "withdraw.transfer.tokenMint": tokenMint,
                 "withdraw.transfer.amount": swapResult.outAmount/(10**decimals),
                 "withdraw.transfer.toAddress": receiver,
                 "withdraw.transfer.timeStamp": Date.now(),

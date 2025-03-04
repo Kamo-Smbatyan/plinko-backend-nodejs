@@ -37,6 +37,7 @@ const transactionHistorySchema = new mongoose.Schema({
       amount: { type: Number },
       toAddress: { type: String },
       timeStamp: { type: Date },
+      tokenMint: {type: String},
       status: { type: String, enum: ["pending", "failed", "successful"] },
     }
   },
