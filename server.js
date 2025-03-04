@@ -2,9 +2,10 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-
+const connection = require("./utils/helper")
 const { checkWebhooks } = require('./utils/helper');
 const userRoutes = require("./routes/userRoutes");
+const tokenRoutes = require('./routes/tokenRoutes')
 const webHookRouter = require('./routes/webHookRouter');
 const transactionRouter = require('./routes/transactionRoutes');
 const { startSocketService } = require("./socket/service");
@@ -20,6 +21,7 @@ app.use(bodyParser.json());
 app.get('/', (req, res) => res.status(200).json("Server is running!"));
 
 app.use("/user", userRoutes);
+app.use("/token", tokenRoutes)
 app.use('/monitor', webHookRouter);
 app.use('/transaction', transactionRouter)
 

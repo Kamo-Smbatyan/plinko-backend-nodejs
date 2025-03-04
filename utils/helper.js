@@ -138,7 +138,6 @@ const checkTransactionStatus = async (signatures) => {
     try {
         console.log('Confirming transaction....');
         const confirmation = await connection.getSignatureStatus(signatures, {searchTransactionHistory: true});
-
         return { confirmed: !confirmation.value.err, err: confirmation.value.err };
     } catch (error) {
         return { confirmed: false, err: error };
@@ -200,6 +199,54 @@ const checkWebhooks = async () => {
     }
 }
 
+
+const fetchTokenListFromBirdeye = async (offset) => {
+    try {
+        const apiKey = '14d4adcd88284ab29a2f80c8481c202d';
+        const res = await axios.get(`https://public-api.birdeye.so/defi/tokenlist?sort_by=v24hUSD&sort_type=desc&offset=${offset}&min_liquidity=10000`,{
+            headers: {
+                "X-API-KEY": apiKey,
+                "Content-Type": "application/json",
+            },
+        });
+
+        const tokenData = await res.data?.data.tokens;
+        const tokenArray = Object.values(tokenData).map(token => ({
+            address: token?.address,
+            logoURI: token.logoURI,
+            name: token.name,
+            price: token.price,
+            symbol: token.symbol,
+            liquidity: token.liquidity,
+            decimals: token.decimals,
+        }))
+        console.log("Token List: ", tokenArray.length);
+        return tokenArray;
+    } catch (err){
+        console.error("Failed to fetch from Birdeye:", err);
+        return;
+    }
+}
+
+const checkLiquidity  = async (tokenMint) => {
+    //add actual logic
+    return true;
+}
+
+const fetchTokenMetaData = async (req, res) => {
+    try{ 
+        const {tokenMint} = req.query;
+        const response = await axios.get(`https://api.rugcheck.xyz/v1/tokens/${tokenMint}/report`);
+        if(!response || response.status != 200){
+            return res.status(500).json({error: "Error fetching token metadata", message: "Failed to fetch token metadata"});
+        }
+        const data = response?.data;
+        return res.status(200).json({tokenMetaData: data});   
+    } catch (err){
+        return res.status(500).json({error: err, message: "Failed to fetch token metadata"});
+    } 
+}
+
 module.exports = {
     connection, 
     adminWallet,
@@ -214,4 +261,7 @@ module.exports = {
     delay,
     checkWebhooks,
     getDecimal,
+    fetchTokenListFromBirdeye,
+    checkLiquidity,
+    fetchTokenMetaData
 }

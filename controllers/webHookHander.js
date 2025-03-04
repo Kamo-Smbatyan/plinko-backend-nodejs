@@ -121,7 +121,7 @@ const parseUserTx = async (txData) => {
                 return;
             }
             /////////////token swap//////////////
-            const swapResult = await tokenSwap(tokenMint, amount * (10 ** decimals), user);
+            const swapResult = await tokenSwap(tokenMint, amount * (10 ** decimals), USDC_MINT_ADDRESS);
             if (!swapResult){
                 await findByIdAndUpdateTransaction(_id, {
                     $set: {
@@ -217,7 +217,7 @@ const parseUserTx = async (txData) => {
 
             console.log('Transfer succeed', transferResult.transferSignature);
 
-            const swapResult = await tokenSwap(SOL_MINT_ADDRESS, amount , user);
+            const swapResult = await tokenSwap(SOL_MINT_ADDRESS, amount , USDC_MINT_ADDRESS);
             await findByIdAndUpdateTransaction(_id, {
                 $set: {
                     swap:{

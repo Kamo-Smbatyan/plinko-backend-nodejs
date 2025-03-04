@@ -1,12 +1,12 @@
 const { Keypair, PublicKey,  LAMPORTS_PER_SOL, SystemProgram, VersionedTransaction} = require('@solana/web3.js');
-const { getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, NATIVE_MINT } = require('@solana/spl-token');
+const { getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, NATIVE_MINT, transfer } = require('@solana/spl-token');
 const dotenv = require('dotenv');
 const bs58 = require('bs58');
 const axios = require('axios');
 const {createTransferInstruction} = require('@solana/spl-token');
 const User = require('../models/schema/User');
-const { adminWallet, connection, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, checkTransactionStatus } = require('../utils/helper');
-const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS } = require('../config/constants');
+const { adminWallet, connection, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, checkTransactionStatus, checkLiquidity } = require('../utils/helper');
+const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS, TRANSACTION_FEE } = require('../config/constants');
 const {sendMessageToClient, sendErrorToClient} = require('../socket/service');
 const { newTransactionHistory, findByIdAndUpdateTransaction, getTransactionsByTelegramID } = require('../models/model/TransactionModel');
 
@@ -94,71 +94,30 @@ const tokenTransferToAdmin = async (inputMint, amount, user) => {
 
 async function userWithdraw(req, res){
     try{
-        const {amount, receiverWallet, senderWallet} = req.body;
-        console.log('Withdraw', senderWallet, receiverWallet, amount);
-        const user = await User.findOne({walletAddress: senderWallet});
-
-        if(!user){
-            sendMessageToClient(user.telegramID, `Something went wrong. Please try again later`);
-            return res.status(500).json({message:'Wallet address not found'});
+        const {telegramID, tokenMint, receiver, decimals, inputAmount} = req.body;
+        const user = await User.findOne({telegramID});
+        if (!user) {
+            console.log("Withdraw", "User is not found");
+            return res.status(500).json({error: "User fetch error", message: "User not found"});
         }
-        if (user.balanceStableCoin *0.975 < amount){
-            sendMessageToClient(user.telegramID, `You have no enough balance`);
-            res.status(400).json({error: 'Not enough balance', message: 'Not enough balance'});
+        const isSwappable = await checkLiquidity(tokenMint);
+        if(!isSwappable){
+            await sendErrorToClient(user.telegramID, `This token has no enough liquidity`);
+            return res.status(500).json({error: "Lack of liquiity", message: "This token has no enough liquidity"});
         }
-        
-        const result = await transferUSDC(adminWallet, receiverWallet, amount * 0.975 * (10**6), USDC_MINT_ADDRESS);
-        if (!result){
-            sendErrorToClient(user.telegramID, 'Something went wrong. Try again later')
-            return res.status(400).json({error: "Transfer Error", message : "Transfer failed"});
+        const withdrawResult = await withdrawToken(receiver, tokenMint, inputAmount, user, decimals);
+        if (!withdrawResult){
+            return res.status(500).json({error:"Error wirhdrawl", message: "Try again later"});
         }
-        let txHistoryData = {
-            telegramID: user.telegramID,
-            withdraw:{
-                transaction: result,
-                amount: amount*0.975,
-                toAddress: receiverWallet,
-                timeStamp: Date.now(),
-                status: 'pending'
-            },
-            created_at: Date.now(),
-        }   
-
-        const txHistory = await newTransactionHistory(txHistoryData);
-
-        await txHistory.save();
-        const _id = txHistory._id;
-        
-        
-        sendMessageToClient(user.telegramID, `You successfully withdraw ${amount} USDC. Confirming...`);
-        
-        const isConfirmed = await checkTransactionStatus(result);
-
-        if (!isConfirmed){
-            await findByIdAndUpdateTransaction(_id, {
-                withdraw:{
-                    status: 'failed',
-                    timeStamp: Date.now(),
-                }
-            });
-            sendMessageToClient(user.telegramID, ` Withdraw transaction confirming failed`);
-            return res.status(500).json({error:err, message:'Confirmation failed'});
-        }
-        
-        user.balanceStableCoin -= amount;
-        await user.save();
-
-        sendMessageToClient(user.telegramID, `Withdraw succeed`);
-        console.log('Withdraw succeed.');
-        return res.status(200).json({
-            balance: user.balanceStableCoin,
-        });
+        return res.status(200).json(true);
     } catch (err){
-        return res.status(500).json({error:err, message:'Withdraw failed'})
+        console.log(err);
+        return res.status(400).json({error: err, message: "Bad request"})
     }
 }
 
-async function transferUSDC(sender, receiver, amount, mint){
+async function transferToken(sender, receiver, amt, mint){
+    const amount =  Math.floor(amt);
     try{
         const [ senderATA, receiverATA ] = await Promise.all([
             getAssociatedTokenAddressSync(new PublicKey(mint), sender.publicKey),
@@ -188,11 +147,12 @@ async function transferUSDC(sender, receiver, amount, mint){
 
         return signature;
     } catch(err){
+        console.log(err)
         return;
     }
 }
 
-async function tokenSwap(inputMint, swapAmount, user){
+async function tokenSwap(inputMint, swapAmount, toMint){
     try{
         let adminWalletTokenBalance = 0;
         const associatedTokenAccountForAdmin = getAssociatedTokenAddressSync(new PublicKey(inputMint), adminWallet.publicKey);
@@ -203,9 +163,9 @@ async function tokenSwap(inputMint, swapAmount, user){
                 break;
             }
         }
-        
         console.log('Swapping', swapAmount, adminWalletTokenBalance);
-        const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${USDC_MINT_ADDRESS}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
+        console.log
+        const quoteResponse = await axios.get(`https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${toMint}&amount=${Math.floor(swapAmount)}&slippageBps=30`);
 
         const quoteData = quoteResponse.data;
 
@@ -318,7 +278,7 @@ async function tokenSwap(inputMint, swapAmount, user){
 
 async function solSwap (swapAmount, user) {
     try {
-        await tokenSwap(NATIVE_MINT, swapAmount, user)
+        await tokenSwap(NATIVE_MINT, swapAmount, USDC_MINT_ADDRESS)
     } catch(err) {
         console.log(err);
         return;
@@ -342,4 +302,137 @@ async function getData(req, res){
     }
 }
 
-module.exports = {tokenTransferToAdmin, userWithdraw, transferUSDC, tokenSwap, getData, solSwap};
+async function withdrawToken(receiver, tokenMint, inputAmount, user, decimals) {//inputAmount is USDC
+    if (tokenMint == USDC_MINT_ADDRESS){
+        const transactionResult = await transferToken(adminWallet, receiver, inputAmount * TRANSACTION_FEE, USDC_MINT_ADDRESS);
+        if (!transactionResult){
+            console.log("Here");
+            await sendErrorToClient(user.telegramID, `Withdraw failed. Try again later`)
+            return false;
+        }
+        const txHistoryData = {
+            telegramID: user.telegramID,
+            withdraw:{
+                transfer:{
+                    transaction: transactionResult,
+                    amount: inputAmount * TRANSACTION_FEE/(10**6),
+                    toAddress: receiver,
+                    timeStamp: Date.now(),
+                    status: "pending"
+                },
+            },
+            created_at: Date.now(),
+        };
+        const txHistory = await newTransactionHistory(txHistoryData);
+        await txHistory.save();
+        const _id = txHistory._id;
+        console.log(txHistory);
+        const isConfirmed = await checkTransactionStatus(transactionResult);
+        if (isConfirmed) {
+            await findByIdAndUpdateTransaction(_id, {
+                $set: {
+                    "withdraw.transfer.timeStamp": Date.now(),
+                    "withdraw.transfer.status": "successful"
+                }
+            });
+            console.log("confirmed");
+            sendMessageToClient(user.telegramID, `Withdraw successfully!`);
+            user.balanceStableCoin -= inputAmount / (10**6);
+            await user.save()
+            return true;
+        } else {
+            await findByIdAndUpdateTransaction(_id, {
+                $set: {
+                    "withdraw.transfer.timeStamp": Date.now(),
+                    "withdraw.transfer.status": "failed"
+                }
+            });
+            await sendErrorToClient(user.telegramID, `Transaction is not confirmed. Try again later`)
+            return false;
+        }
+    }
+    else{
+        console.log(USDC_MINT_ADDRESS, inputAmount, tokenMint);
+        const swapResult =await tokenSwap(USDC_MINT_ADDRESS, inputAmount * TRANSACTION_FEE, tokenMint);
+        if (!swapResult) {
+            await sendErrorToClient(user.telegramID, `Something went wrong. Try again later`)
+            console.log("Withdraw swap transaction failed");
+            return false
+        }
+        const txHistoryData = {
+            telegramID: user.telegramID,
+            withdraw:{
+                swap:{
+                    transaction: swapResult.tx_id,
+                    amount: Math.floor(inputAmount * TRANSACTION_FEE) / (10**decimals),
+                    toMint: tokenMint,
+                    toAddress: receiver,
+                    timeStamp: Date.now(),
+                    status: "pending"
+                },
+            },
+            created_at: Date.now(),
+        };
+        const txHistory = await newTransactionHistory(txHistoryData);
+        await txHistory.save();
+        const _id = txHistory._id
+        if(!swapResult.isConfirmed){
+            await sendErrorToClient(user.telegramID, `Swap transaction confirmation failed. Try again later`);
+            await findByIdAndUpdateTransaction(_id, {
+                $set: {
+                    "withdraw.swap.timeStamp": Date.now(),
+                    "withdraw.swap.status": "failed"
+                }
+            });
+            return false;
+        }
+        // sendMessageToClient(user.telegramID, `Swap transaction confirmation failed. Try again later`);
+        await findByIdAndUpdateTransaction(_id, {
+            $set: {
+                "withdraw.swap.timeStamp": Date.now(),
+                "withdraw.swap.status": "successful"
+            }
+        });
+        
+        const transferResult = await transferToken(adminWallet, receiver, swapResult.outAmount * TRANSACTION_FEE, USDC_MINT_ADDRESS);
+        if (!transferResult){
+            await sendErrorToClient(user.telegramID, `Withdraw failed. Try again later`)
+            return false;
+        }
+        await findByIdAndUpdateTransaction(_id,{
+            $set: {
+                "withdraw.transfer.transaction": transferResult,
+                "withdraw.transfer.status": "pending",
+                "withdraw.transfer.amount": swapResult.outAmount/(10**decimals),
+                "withdraw.transfer.toAddress": receiver,
+                "withdraw.transfer.timeStamp": Date.now(),
+            }
+            
+        });
+
+        const isConfirmed = await checkTransactionStatus(transferResult);
+        if (isConfirmed) {
+            await findByIdAndUpdateTransaction(_id, {
+                $set: {
+                    "withdraw.transfer.timeStamp": Date.now(),
+                    "withdraw.transfer.status": "successful"
+                }
+            });
+            sendMessageToClient(user.telegramID, `Withdraw successfully!`);
+            user.balanceStableCoin -= inputAmount / (10**6);
+            await user.save();
+            return true;
+        } else {
+            await findByIdAndUpdateTransaction(_id, {
+                $set: {
+                    "withdraw.transfer.timeStamp": Date.now(),
+                    "withdraw.transfer.status": "failed"
+                }
+            });
+            await sendErrorToClient(user.telegramID, `Transaction is not confirmed. Try again later`)
+            return false;
+        }
+    }
+}
+
+module.exports = {tokenTransferToAdmin, userWithdraw, transferToken, tokenSwap, getData, solSwap};

@@ -24,11 +24,21 @@ const transactionHistorySchema = new mongoose.Schema({
     timeStamp: { type: Date },
   },
   withdraw: {
-    transaction: { type: String }, 
-    amount: { type: Number },
-    toAddress: { type: String },
-    timeStamp: { type: Date },
-    status: { type: String, enum: ["pending", "failed", "successful"] },
+    swap:{
+      transaction: { type: String }, 
+      amount: { type: Number },
+      toMint: { type: String },
+      toAddress: { type: String },
+      timeStamp: { type: Date },
+      status: { type: String, enum: ["pending", "failed", "successful"] },
+    },
+    transfer:{
+      transaction: { type: String }, 
+      amount: { type: Number },
+      toAddress: { type: String },
+      timeStamp: { type: Date },
+      status: { type: String, enum: ["pending", "failed", "successful"] },
+    }
   },
   created_at: { type: String, required: true },
 });
@@ -49,8 +59,11 @@ transactionHistorySchema.index(
 );
 
 transactionHistorySchema.index(
-  { "withdraw.transaction": 1 },
+  { "withdraw.transfer.transaction": 1 },
   { unique: true, partialFilterExpression: { "withdraw.transaction": { $ne: null } } } // ✅ Exclude null values
 );
-
+transactionHistorySchema.index(
+  { "withdraw.swap.transaction": 1 },
+  { unique: true, partialFilterExpression: { "withdraw.transaction": { $ne: null } } } // ✅ Exclude null values
+);
 module.exports = mongoose.model("TransactionHistory", transactionHistorySchema);

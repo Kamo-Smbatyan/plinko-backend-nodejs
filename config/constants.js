@@ -69,6 +69,8 @@ const JUPITER_API_BASE_URL = {
     SWAP: 'https://api.jup.ag/swap/v1/swap/',
 }
 
+const TRANSACTION_FEE = process.env.TRANSACTION_FEE_RATE || 0.975 
+
 module.exports = {
     TX_STATE,
     TX_TYPE,
@@ -82,5 +84,6 @@ module.exports = {
     setUserTxState,
     getUserTxState,
     SOL_MINT_ADDRESS,
-    USDC_MINT_ADDRESS
+    USDC_MINT_ADDRESS,
+    TRANSACTION_FEE
 };
