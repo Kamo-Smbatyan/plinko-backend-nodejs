@@ -63,7 +63,7 @@ async function getUserData(req, res){
         error:'User not found'
       });
     }
-    sendStatusMessageToClient(telegramID, `Your balance: ${user.balanceStableCoin}`);
+    sendStatusMessageToClient(telegramID, `Your balance: ${user.balanceStableCoin.toFixed(2)}`);
     return res.json({
       walletAddress: user.walletAddress,
       balance: user.balanceStableCoin
