@@ -5,6 +5,7 @@ const { getDecimal, checkTransactionStatus, checkLiquidity } = require('../utils
 const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS, TRANSACTION_FEE } = require('../config/constants');
 const { sendSuccessMessageToClient, sendErrorMessageToClient, sendStatusMessageToClient } = require("../socket/service");
 const {newTransactionHistory,  findByIdAndUpdateTransaction} = require("../models/model/TransactionModel");
+const {TransactionHistory} = require('../models/schema/TransactionHistory')
 
 let tempTxData = '';
 
@@ -44,6 +45,13 @@ const parseUserTx = async (txData) => {
             const amount = tokenTransfer.tokenAmount;
             const decimals = await getDecimal(tokenMint);
             const checkLp = await checkLiquidity(tokenMint);
+            const existingTransaction = await TransactionHistory.findOne({
+                "deposit.transaction": transactionData.deposit.transaction,
+            });
+            if(existingTransaction){
+                console.log("Duplicated transaction. Ignored");
+                return;
+            }
             if(!checkLp){
                 sendStatusMessageToClient(user.telegramID, `Liquidity is lower than 10k. Please try again with other token`)
                 return;
