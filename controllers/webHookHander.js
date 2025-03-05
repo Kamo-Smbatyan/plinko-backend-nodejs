@@ -5,7 +5,7 @@ const { getDecimal, checkTransactionStatus, checkLiquidity } = require('../utils
 const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS, TRANSACTION_FEE } = require('../config/constants');
 const { sendSuccessMessageToClient, sendErrorMessageToClient, sendStatusMessageToClient } = require("../socket/service");
 const {newTransactionHistory,  findByIdAndUpdateTransaction} = require("../models/model/TransactionModel");
-const {TransactionHistory} = require('../models/schema/TransactionHistory')
+const TransactionHistory = require('../models/schema/TransactionHistory')
 
 let tempTxData = '';
 
