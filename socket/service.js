@@ -65,6 +65,7 @@ const watchUserBalanceUpdates = () => {
         if (!user) return;
 
         // Emit socket event with updated balance
+        sendStatusMessageToClient(user.telegramID, `Your balance: ${user.balanceStableCoin}`);
         socketIO.emit("updated-balance", JSON.stringify({
           telegramID: user.telegramID,
           balance: user.balanceStableCoin

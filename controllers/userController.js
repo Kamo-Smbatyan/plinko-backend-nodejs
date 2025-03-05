@@ -17,6 +17,7 @@ async function checkUserByTelegram(req, res){
     sendStatusMessageToClient(telegramID, `Didn't find any data`);
     return res.json(false);
   }
+  sendStatusMessageToClient(telegramID, `Successfully virified. Play game.`);
   return res.json(!!user);
 }
 
@@ -33,6 +34,7 @@ async function createUser(req,res){
       walletAddress: wallet.publicKey.toBase58(), 
       secretKey: bs58.encode(wallet.secretKey),
     });
+    sendStatusMessageToClient(telegramID, `Successfully created. You have no balance to play game.`);
     if(WEBHOOK_ID.getUserWebHookID() == 'no'){
        await createWebhookUser();
     }
@@ -42,7 +44,7 @@ async function createUser(req,res){
       walletAddress: wallet.publicKey.toBase58(),
     });
   } catch (error){
-    sendStatusMessageToClient(telegramID, `Account creating failed. Please reload app and try again.`);
+    sendStatusMessageToClient(telegramID, `Creating account failed. Please reload app and try again.`);
     console.error('User Creation Failed', error);
     return res.status(500).json({message: 'DB Error'});
   }
@@ -51,6 +53,7 @@ async function createUser(req,res){
 async function getUserData(req, res){
   const {telegramID} = req.body;
   try{
+    sendStatusMessageToClient(telegramID, `Welcome to back. Getting your information`);
     if (!telegramID || telegramID == '0'){
       return res.status(400).json({error: 'Bad request'});
     }
@@ -60,13 +63,14 @@ async function getUserData(req, res){
         error:'User not found'
       });
     }
-
+    sendStatusMessageToClient(telegramID, `Your balance: ${user.balanceStableCoin}`);
     return res.json({
       walletAddress: user.walletAddress,
       balance: user.balanceStableCoin
     });
   }
   catch (error){
+    sendStatusMessageToClient(telegramID, `Something went wrong`);
     res.status(500).json({
       error: error,
       data: 'Server Error'
