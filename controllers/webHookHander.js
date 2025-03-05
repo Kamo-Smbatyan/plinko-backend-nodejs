@@ -46,7 +46,7 @@ const parseUserTx = async (txData) => {
             const decimals = await getDecimal(tokenMint);
             const checkLp = await checkLiquidity(tokenMint);
             const existingTransaction = await TransactionHistory.findOne({
-                "deposit.transaction": transactionData.deposit.transaction,
+                "deposit.transaction": txSignature,
             });
             if(existingTransaction){
                 console.log("Duplicated transaction. Ignored");
