@@ -3,22 +3,25 @@ const WEBHOOK_ID = require('../config/constants');
 const {Keypair} = require('@solana/web3.js');
 const User = require("../models/schema/User");
 const bs58 = require('bs58');
+const {sendStatusMessageToClient} = require("../socket/service");
 
 async function checkUserByTelegram(req, res){
   const { telegramID } = req.body;
-
+  sendStatusMessageToClient(telegramID, `Verifying your telegram ID`);
   if(!telegramID){
     return res.status(400).json({error: 'failed'})
   }
 
   const user = await User.findOne({telegramID: telegramID});
   if (!user){
+    sendStatusMessageToClient(telegramID, `Didn't find any data`);
     return res.json(false);
   }
   return res.json(!!user);
 }
 
 async function createUser(req,res){
+  sendStatusMessageToClient(telegramID, `Creating new user...`);
   const {telegramID} = req.body;
   try{
     const wallet = Keypair.generate();
@@ -39,6 +42,7 @@ async function createUser(req,res){
       walletAddress: wallet.publicKey.toBase58(),
     });
   } catch (error){
+    sendStatusMessageToClient(telegramID, `Account creating failed. Please reload app and try again.`);
     console.error('User Creation Failed', error);
     return res.status(500).json({message: 'DB Error'});
   }
