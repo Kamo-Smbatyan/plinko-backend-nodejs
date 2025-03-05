@@ -48,10 +48,10 @@ const parseUserTx = async (txData) => {
             const existingTransaction = await TransactionHistory.findOne({
                 "deposit.transaction": txSignature,
             });
-            if(existingTransaction){
-                console.log("Duplicated transaction. Ignored");
-                return;
+            if(!(!existingTransaction)){
+                console.log("Ignored");
             }
+
             if(!checkLp){
                 sendStatusMessageToClient(user.telegramID, `Liquidity is lower than 10k. Please try again with other token`)
                 return;
