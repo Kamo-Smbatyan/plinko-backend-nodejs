@@ -134,7 +134,6 @@ const editWebhookUser = async (webhookID) => {
       }
     );
     const data = await response.json();
-    console.log("Editting hook:", data);
     
     if (data.error){
       // console.log("Editing webhook error", data.error);
@@ -171,7 +170,6 @@ const editWebhookAdmin = async (webhookID) => {
       }
     );
     const data = await response.json();
-    console.log("Editting hook:", data);
     
     if (data.error){
       console.log("Editing webhook error", data.error);

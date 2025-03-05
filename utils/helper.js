@@ -199,7 +199,6 @@ const checkWebhooks = async () => {
     }
 }
 
-
 const fetchTokenListFromBirdeye = async (offset) => {
     try {
         const apiKey = '14d4adcd88284ab29a2f80c8481c202d';
@@ -230,7 +229,16 @@ const fetchTokenListFromBirdeye = async (offset) => {
 
 const checkLiquidity  = async (tokenMint) => {
     //add actual logic
-    return true;
+    try{ 
+        const response = await axios.get(`https://api.rugcheck.xyz/v1/tokens/${tokenMint}/report`);
+        if(!response || response.status != 200){
+            return false
+        }
+        const data = response?.data?.totalMarketLiquidity;
+        return (data > 10000);
+    } catch (err){
+        return false;
+    } 
 }
 
 const fetchTokenMetaData = async (req, res) => {

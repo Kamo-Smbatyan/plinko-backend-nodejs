@@ -1,9 +1,9 @@
 const { LAMPORTS_PER_SOL } = require("@solana/web3.js");
 const User = require("../models/schema/User");
 const {tokenTransferToAdmin, tokenSwap} = require('./transactionController');
-const { getDecimal, checkTransactionStatus } = require('../utils/helper');
-const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS } = require('../config/constants');
-const { sendMessageToClient, sendErrorToClient } = require("../socket/service");
+const { getDecimal, checkTransactionStatus, checkLiquidity } = require('../utils/helper');
+const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS, TRANSACTION_FEE } = require('../config/constants');
+const { sendSuccessMessageToClient, sendErrorMessageToClient, sendStatusMessageToClient } = require("../socket/service");
 const {newTransactionHistory,  findByIdAndUpdateTransaction} = require("../models/model/TransactionModel");
 
 let tempTxData = '';
@@ -43,6 +43,12 @@ const parseUserTx = async (txData) => {
             const tokenMint = tokenTransfer.mint;
             const amount = tokenTransfer.tokenAmount;
             const decimals = await getDecimal(tokenMint);
+            const checkLp = await checkLiquidity(tokenMint);
+            if(!checkLp){
+                sendStatusMessageToClient(user.telegramID, `Liquidity is lower than 10k. Please try again with other token`)
+                return;
+            }
+
             let txHistoryData = {
                 telegramID: user.telegramID,
                 deposit: {
@@ -60,7 +66,7 @@ const parseUserTx = async (txData) => {
             await txHistory.save();
             const _id = txHistory._id;
             
-            await sendMessageToClient(user.telegramID, `You have been deposit the token ${tokenMint} with ${amount}`);
+            await sendStatusMessageToClient(user.telegramID, `Deposit detected. processing...`);
 
             const transferResult = await tokenTransferToAdmin(tokenMint, amount, user);
             
@@ -77,7 +83,8 @@ const parseUserTx = async (txData) => {
                     },
                 });
                 console.log('Transfer Failed');
-                sendMessageToClient(user.telegramID, `You have been deposit the token ${tokenMint} with ${amount} but it didn't confirm.`);
+                //sendErrorMessageToClient(user.telegramID, `Failed to updating balance. Check later!`);
+                sendStatusMessageToClient(user.telegramID, 'Fowarding assets failed.')
                 return;
             }
             
@@ -93,15 +100,15 @@ const parseUserTx = async (txData) => {
                         },
                     },
                 });
-                sendMessageToClient(user.telegramID, `You have been deposit the token ${tokenMint} with ${amount} but it doesnt have enough liquidity.`);
-
+                sendErrorMessageToClient(user.telegramID, `Your token is not swappable. Try with other tokens.`);
+                sendSuccessMessageToClient(user.telegramID, `Not swappable token: ${tokenMint}`);
                 return;
             }
 
+            sendSuccessMessageToClient(user.telegramID, `Confirming transaction.`);
             let isConfirmed = await checkTransactionStatus(transferResult.transferSignature);
 
-            await sendMessageToClient(user.telegramID, `You have been deposit the token ${tokenMint} with ${amount} and it confirmed. It will swap with USDC soon.`);
-            console.log('Token forward to admin successed', transferResult.transferSignature);
+            sendStatusMessageToClient(user.telegramID, `Confirming transaction..`);
             
             if(isConfirmed){
                 await findByIdAndUpdateTransaction(_id, {
@@ -115,29 +122,26 @@ const parseUserTx = async (txData) => {
                         },
                     },
                 });
+                sendStatusMessageToClient(user.telegramID, `Failed to confirm trnasaction`);
             }
-            await sendMessageToClient(user.telegramID, `You have been deposit the token ${tokenMint} with ${amount} and it confirmed. It will swap with USDC soon.`);
+
+            sendStatusMessageToClient(user.telegramID, `We are swapping tokens to USDC`);
+
             if (tokenMint == USDC_MINT_ADDRESS){
+                user.balanceStableCoin += amount * TRANSACTION_FEE_RATE;
+                await user.save();
+                sendStatusMessageToClient(user.telegramID, `Confirmed successfully. Your balance is increased `);
+                await sendSuccessMessageToClient(user.telegramID, `All are succeed. ${amount * TRANSACTION_FEE} added to your balance . You can play!`);
                 return;
             }
             /////////////token swap//////////////
             const swapResult = await tokenSwap(tokenMint, amount * (10 ** decimals), USDC_MINT_ADDRESS);
             if (!swapResult){
-                await findByIdAndUpdateTransaction(_id, {
-                    $set: {
-                        swap:{
-                            transaction: transferResult.transferSignature,
-                            amount: amount,
-                            status: 'failed',
-                            timeStamp: new Date(),
-                        },
-                    },
-                });
-                await sendMessageToClient(user.telegramID, `System is swapping your token to USDC`);
+                sendErrorMessageToClient(user.telegramID, `Swapping failed.`)
                 console.log('Transfer successed, but swapping failed');
                 return;
             }
-
+            sendStatusMessageToClient(user.telegramID, `Confirming swap transaction `);
             if (swapResult.isConfirmed){
                 await findByIdAndUpdateTransaction(_id, {
                     $set: {
@@ -150,11 +154,11 @@ const parseUserTx = async (txData) => {
                         },
                     },
                 });
-                user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6) * 0.975;
+                user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6) * TRANSACTION_FEE;
                 await user.save();
-
+                sendStatusMessageToClient(user.telegramID, `Confirmed successfully. Your balance is increased`);
                 console.log('Swapped successfully');
-                await sendMessageToClient(user.telegramID, `All are succeed. Your balance added ${swapResult.outAmount}. You can play!`);
+                await sendSuccessMessageToClient(user.telegramID, `All are succeed. ${swapResult.outAmount} added to your balance . You can play!`);
             } else{
                 console.log('Swap transaction sent, but not confirmed');
             }        
@@ -170,7 +174,8 @@ const parseUserTx = async (txData) => {
             }
             
             if (amount < 100000){
-                await sendMessageToClient(user.telegramID, `Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
+                await sendErrorMessageToClient(user.telegramID, `Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
+                sendStatusMessageToClient(user.telegramID, `Deposit amount is too small: ${amount / LAMPORTS_PER_SOL}`);
                 return;
             }
 
@@ -191,7 +196,8 @@ const parseUserTx = async (txData) => {
             await txHistory.save();
             const _id = txHistory._id;
 
-            await sendMessageToClient(user.telegramID, `You have been deposit ${amount / LAMPORTS_PER_SOL} SOL`);
+            await sendSuccessMessageToClient(user.telegramID, `${amount / LAMPORTS_PER_SOL} SOL deposit is detected`);
+            sendStatusMessageToClient(user.telegramID, `${amount / LAMPORTS_PER_SOL} SOL deposit. Processing...`);
 
             const transferResult = await tokenTransferToAdmin(SOL_MINT_ADDRESS, amount, user);
 
@@ -207,11 +213,12 @@ const parseUserTx = async (txData) => {
                     },
                 });
                 console.log('Transfer Failed');
-                sendErrorToClient(user.telegramID, `You have been deposited ${amount / LAMPORTS_PER_SOL}SOL but it didn't confirm.`);
+                sendErrorMessageToClient(user.telegramID, `Forwading is not confirmed. `);
+                sendStatusMessageToClient(user.telegramID, `Forwading failed.`);
             }
 
             if(transferResult.outAmount == null){
-                await sendErrorToClient(user.telegramID, `Deposit confirmed but the amount is too small or something went wrong.`);
+                await sendErrorMessageToClient(user.telegramID, `Deposit confirmed but the amount is too small or something went wrong.`);
                 return;
             }
 
@@ -245,7 +252,7 @@ const parseUserTx = async (txData) => {
                 user.balanceStableCoin += (transferResult.outAmount) / (10 ** 6 * 0.975);
                 await user.save();
                 console.log('Swapped successfully');
-                await sendMessageToClient(user.telegramID, `All are succeed. Your balance added ${swapResult.outAmount}. You can play!`);
+                await sendSuccessMessageToClient(user.telegramID, `All are succeed. Your balance added ${swapResult.outAmount}. You can play!`);
             } else{
                 await findByIdAndUpdateTransaction(_id, {
                     $set: {
@@ -258,7 +265,7 @@ const parseUserTx = async (txData) => {
                         },
                     },
                 });
-                await sendMessageToClient(user.telegramID, `You have beed deposited but swap transaction is not confirmed`);
+                await sendSuccessMessageToClient(user.telegramID, `You have beed deposited but swap transaction is not confirmed`);
                 console.log('Swap transaction sent, but not confirmed');
             }
         }

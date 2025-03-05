@@ -97,21 +97,28 @@ const watchTransactionHistoryTableUpdates = () => {
   })
 }
 
-const sendMessageToClient = async (telegramID, msg) => {
+const sendSuccessMessageToClient = async (telegramID, msg) => {
   socketIO.emit('notification', JSON.stringify({
     telegramID,
     msg
   }));
 }
 
-const sendErrorToClient = async (telegramID, msg) => {
+const sendErrorMessageToClient = async (telegramID, msg) => {
   socketIO.emit('error-notification',JSON.stringify({
+    telegramID, msg
+  }));
+}
+
+const sendStatusMessageToClient = async (telegramID, msg) => {
+  socketIO.emit('status-notification',JSON.stringify({
     telegramID, msg
   }));
 }
 
 module.exports = {
   startSocketService,
-  sendMessageToClient,
-  sendErrorToClient,
+  sendSuccessMessageToClient,
+  sendErrorMessageToClient,
+  sendStatusMessageToClient,
 }
