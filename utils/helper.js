@@ -1,12 +1,12 @@
-const { MessageV0, Connection, AddressLookupTableAccount, Keypair, TransactionInstruction, TransactionMessage, VersionedTransaction } = require('@solana/web3.js');
+const { Connection, AddressLookupTableAccount, Keypair, TransactionInstruction, TransactionMessage, VersionedTransaction, LAMPORTS_PER_SOL, PublicKey } = require('@solana/web3.js');
 const bs58 = require('bs58');
 const {createWebhookUser, createWebhookAdmin, getWebhooks, editWebhookUser, editWebhookAdmin} = require('../config/webhook');
 const dotenv = require('dotenv');
-const { AccountLayout, } = require('@solana/spl-token');
+const { AccountLayout, createAssociatedTokenAccountInstruction, createTransferInstruction} = require('@solana/spl-token');
 const axios = require('axios');
 
 const WEBHOOK_ID = require('../config/constants');
-const { JITO_TIP_ACCOUNTS, JITO_ENDPOINTS } = require('../config/constants');
+const { JITO_ENDPOINTS } = require('../config/constants');
 
 dotenv.config();
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
@@ -14,8 +14,12 @@ const connection = new Connection(process.env.SOLANA_RPC_URL);
 const adminWallet = Keypair.fromSecretKey(bs58.decode(process.env.ADMIN_WALLET_SECRETKEY));
 
 const deserializeTransaction = (swapTransaction) => {
-    const transactionBuffer = Buffer.from(swapTransaction, 'base64');
-    return VersionedTransaction.deserialize(transactionBuffer).message;
+    try{
+        const transactionBuffer = Buffer.from(swapTransaction, 'base64');
+        return VersionedTransaction.deserialize(transactionBuffer).message;
+    } catch (err){
+        throw new Error("Error in deserializing transaction", err);
+    }
 }
 
 const resolveAddressLookups = async (message) => {
@@ -101,8 +105,8 @@ const getTokenBalance = async (associatedTokenAccount) => {
 }
 
 const sendBundleRequest = async (serializedTransactions) => {
-    const request = JITO_ENDPOINTS.map((url) => 
-        axios.post(url, 
+    const request = JITO_ENDPOINTS.map(async (url) => 
+        await axios.post(url, 
             {
                 jsonrpc: '2.0',
                 id: 1,
@@ -124,9 +128,7 @@ const sendBundleRequest = async (serializedTransactions) => {
     const successfulResults = results.filter((result) => !(result instanceof Error));
 
     if (successfulResults.length > 0) {
-        // console.log('Jito: At least one successful response');
-        // console.log('Jito: Confirming transaction...');
-        console.log(signautre)
+        console.log('Jito: At least one successful response');
         return true;
     } else {
         console.log('Jito: No successful responses received for jito');
@@ -255,6 +257,170 @@ const fetchTokenMetaData = async (req, res) => {
     } 
 }
 
+const getSwapQuoteFromJup = async (inputMint, outputMint, inputAmount, slippageBps, walletAddress) => {
+
+        if (!inputMint || !outputMint || !inputAmount){
+            throw new Error("Invailed parameters");
+        }
+        if(inputMint === outputMint){
+            throw new Error("Input token equals output token");
+        }
+        const url = `https://api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${Math.floor(inputAmount)}&slippageBps=${slippageBps}`
+        console.log(url);
+        const quoteResponse = await axios.get(url);
+        if(quoteResponse.error){
+            throw new Error("Error:", err);
+        }
+        const quoteData = quoteResponse.data;
+        if (quoteData.error){
+            throw new Error('Get swap quote failed');
+        }
+        const outAmount = quoteData.outAmount;
+        const swapRequestBody = {
+            quoteResponse: quoteData,
+            userPublicKey: walletAddress,
+            // dynamicComputeUnitLimit: true,
+            prioritizationFeeLamports: {
+                jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
+            },
+        };
+        return { swapRequestBody, outAmount };
+}
+const getSwapTransactionFromJup = async ( quoteResponse ) => {
+    try {
+        const swapResponse = await axios.post(`https://api.jup.ag/swap/v1/swap`, quoteResponse);
+            
+        if ( swapResponse.error){
+            throw new Error('Failed to get swap instructions:', swapResponse.error);
+        }
+
+        const swapData = swapResponse.data
+
+        return swapData.swapTransaction
+    } catch (err){
+        throw new Error("Failed to get swap Instruction", err);
+    }
+}
+
+const getSwapInstructionFromJup = async (quoteResponse, signers) => {
+    try {
+        const instructions = await axios.post('https://api.jup.ag/swap/v1/swap-instructions', quoteResponse);
+    
+        if (instructions.error) {
+            throw new Error("Failed to get swap instructions: " + instructions.error);
+        }
+        
+        const {
+            tokenLedgerInstruction, // If you are using `useTokenLedger = true`.
+            computeBudgetInstructions, // The necessary instructions to setup the compute budget.
+            setupInstructions, // Setup missing ATA for the users.
+            swapInstruction: swapInstructionPayload, // The actual swap instruction.
+            cleanupInstruction, // Unwrap the SOL if `wrapAndUnwrapSol = true`.
+            addressLookupTableAddresses, // The lookup table addresses that you can use if you are using versioned transaction.
+        } = instructions.data;
+        console.log(instructions.data);
+        const deserializeInstruction = (instruction) => {
+            return new TransactionInstruction({ 
+            programId: new PublicKey(instruction.programId),
+            keys: instruction.accounts.map((key) => ({
+                pubkey: new PublicKey(key.pubkey),
+                isSigner: key.isSigner,
+                isWritable: key.isWritable,
+            })),
+            data: Buffer.from(instruction.data, "base64"),
+            });
+        };
+        
+        const getAddressLookupTableAccounts = async (keys) => {
+            const addressLookupTableAccountInfos =
+            await connection.getMultipleAccountsInfo(
+                keys.map((key) => new PublicKey(key))
+            );
+        
+            return addressLookupTableAccountInfos.reduce((acc, accountInfo, index) => {
+                const addressLookupTableAddress = keys[index];
+                if (accountInfo) {
+                    const addressLookupTableAccount = new AddressLookupTableAccount({
+                    key: new PublicKey(addressLookupTableAddress),
+                    state: AddressLookupTableAccount.deserialize(accountInfo.data),
+                    });
+                    acc.push(addressLookupTableAccount);
+                }
+            
+                return acc;
+            }, new Array());
+        };
+        
+        const addressLookupTableAccounts = [];
+        
+        addressLookupTableAccounts.push(
+            ...(await getAddressLookupTableAccounts(addressLookupTableAddresses))
+        );
+        
+        const blockhash = (await connection.getLatestBlockhash()).blockhash;
+        const messageV0 = new TransactionMessage({
+            payerKey: signers[0].publicKey,
+            recentBlockhash: blockhash,
+            instructions: [
+            // uncomment if needed: ...setupInstructions.map(deserializeInstruction),
+                deserializeInstruction(swapInstructionPayload),
+            // uncomment if needed: deserializeInstruction(cleanupInstruction),
+            ],
+        }).compileToV0Message(addressLookupTableAccounts);
+        const transaction = new VersionedTransaction(messageV0);
+        transaction.sign([adminWallet]);
+        return bs58.encode(transaction.signatures[0]);
+    } catch (err){
+        throw new Error("Failed to get swap instruction", err);
+    }
+}
+
+const tokenSwap = async (walletAddress, inputMint, outputMint, inputAmount, slippageBps, signers) => {
+    try{
+        const {swapRequestBody, outAmount} = await getSwapQuoteFromJup(inputMint, outputMint, inputAmount, slippageBps, walletAddress);
+        const swapTxHash = await getSwapInstructionFromJup (swapRequestBody, signers);
+        console.log(swapTxHash);
+        const isSent = await sendBundleRequest(swapTxHash);
+        return {isSent, swapTxHash, outAmount};
+    } catch (error){
+        throw new Error("Error in token swap", err);
+    }
+}
+
+const tokenTransfer = async (senderWallet, receiverAddress, tokenMint, amount, signers) => {
+    try{
+        const [ senderATA, receiverATA ] = await Promise.all([
+            getAssociatedTokenAddressSync(new PublicKey(tokenMint), senderWallet.publicKey),
+            getAssociatedTokenAddressSync(new PublicKey(tokenMint), new PublicKey(receiverAddress)),
+        ]);
+        const instructions = [];
+        if(!(await checkTokenAccountExistence(receiverATA))) {
+            instructions.push( createAssociatedTokenAccountInstruction( signers[0].publicKey, receiverATA, new PublicKey(receiverAddress), new PublicKey(mint)));
+        }
+        const [ tokenBalance, latestBlockhash ] = await Promise.all([
+            getTokenBalance(senderATA),
+            connection.getLatestBlockhash()
+        ]);
+        console.log("token balance:",tokenBalance)
+        if(tokenBalance < amount) {
+            console.log('Sender wallet has no enough assets');
+            return;
+        }
+
+        const signersArray = (senderWallet in signers) ? signers : [...signers, senderWallet] ;
+
+        instructions.push(createTransferInstruction(senderATA, receiverATA, senderWallet.publicKey, amount));
+        const versionedTransaction = await createVersionedTransaction(signersArray, instructions, latestBlockhash);
+
+        const signature = await connection.sendRawTransaction(versionedTransaction.serialize(), signersArray);
+
+        return signature;
+    } catch(err){
+        console.log(err)
+        return;
+    }
+}
+
 module.exports = {
     connection, 
     adminWallet,
@@ -271,5 +437,10 @@ module.exports = {
     getDecimal,
     fetchTokenListFromBirdeye,
     checkLiquidity,
-    fetchTokenMetaData
+    fetchTokenMetaData,
+    getSwapQuoteFromJup,
+    getSwapTransactionFromJup,
+    tokenSwap,
+    getSwapInstructionFromJup,
+    tokenTransfer    
 }

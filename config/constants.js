@@ -8,25 +8,11 @@ const TX_STATE = {
     CONFIRMED: 'Confirmed',
 }
 
-const TX_TYPE = {
-    DEPOSIT: 'deposit',
-    SWAP: 'swap',
-    WIDRAW: 'withdraw',
-}
-
-const USER_TX_STATE = [];
 const USER_WEBHOOK_ID =process.env.USER_WEBHOOK_ID || null ;
 const ADMIN_WEBHOOK_ID = process.env.ADMIN_WEBHOOK_ID || null;
 const SOL_MINT_ADDRESS = process.env.SOL_MINT_ADDRESS || "";
 const USDC_MINT_ADDRESS = process.env.USDC_MINT_ADDRESS || "";
 
-const setUserTxState = (telegramID, data) =>{
-     USER_TX_STATE[telegramID] = data
-}
-
-const getUserTxState = (telegramID) => {
-    return USER_TX_STATE[telegramID];
-}
 
 function setUserWebHookID(value){
     USER_WEBHOOK_ID = value
@@ -81,8 +67,6 @@ module.exports = {
     JITO_ENDPOINTS,
     JITO_TIP_ACCOUNTS,
     JUPITER_API_BASE_URL,
-    setUserTxState,
-    getUserTxState,
     SOL_MINT_ADDRESS,
     USDC_MINT_ADDRESS,
     TRANSACTION_FEE

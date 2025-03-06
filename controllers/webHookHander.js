@@ -48,6 +48,7 @@ const parseUserTx = async (txData) => {
             const existingTransaction = await TransactionHistory.findOne({
                 "deposit.transaction": txSignature,
             });
+            
             if(!(!existingTransaction)){
                 console.log("Ignored");
             }

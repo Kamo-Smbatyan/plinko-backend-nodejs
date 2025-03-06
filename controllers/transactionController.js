@@ -1,9 +1,8 @@
 const { Keypair, PublicKey,  LAMPORTS_PER_SOL, SystemProgram, VersionedTransaction} = require('@solana/web3.js');
-const { getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, NATIVE_MINT, transfer } = require('@solana/spl-token');
+const { getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction, NATIVE_MINT, createTransferInstruction } = require('@solana/spl-token');
 const dotenv = require('dotenv');
 const bs58 = require('bs58');
 const axios = require('axios');
-const {createTransferInstruction} = require('@solana/spl-token');
 const User = require('../models/schema/User');
 const { adminWallet, connection, delay, createVersionedTransaction, checkTokenAccountExistence, getTokenBalance, checkTransactionStatus, checkLiquidity } = require('../utils/helper');
 const { SOL_MINT_ADDRESS, USDC_MINT_ADDRESS, TRANSACTION_FEE } = require('../config/constants');
