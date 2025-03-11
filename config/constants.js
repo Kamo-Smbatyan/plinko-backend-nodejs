@@ -58,8 +58,6 @@ const JUPITER_API_BASE_URL = {
 const TRANSACTION_FEE = process.env.TRANSACTION_FEE_RATE || 0.975 
 
 module.exports = {
-    TX_STATE,
-    TX_TYPE,
     setUserWebHookID, 
     getUserWebHookID,
     setAdminWebhookID,

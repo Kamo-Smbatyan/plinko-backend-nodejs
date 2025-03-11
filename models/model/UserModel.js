@@ -1,8 +1,12 @@
 const User = require("../schema/User"); // Import the User model
-
-const createUser = async (userData) => {
+const bs58 = require('bs58');
+const createNewUser = async (telegramID, newWallet) => {
   try {
-    const newUser = new User(userData);
+    const newUser = new User({
+      telegramID: telegramID,
+      walletAddress: newWallet.publicKey.toBase58(),
+      secretKey: bs58.encode(newWallet.secretKey),
+    });
     await newUser.save();
     return { success: true, data: newUser };
   } catch (error) {
@@ -26,8 +30,7 @@ const updateUserBalance = async (telegramID, balanceUpdate) => {
   try {
     const updatedUser = await User.findOneAndUpdate(
       { telegramID },
-      { $set: balanceUpdate },
-      { new: true }
+      { $set: {"balanceStableCoin": balanceUpdate} },
     );
     if (!updatedUser) return { success: false, error: "User not found" };
     return { success: true, data: updatedUser };
@@ -58,7 +61,7 @@ const getAllUsers = async () => {
 };
 
 module.exports = {
-  createUser,
+  createNewUser,
   getUser,
   updateUserBalance,
   deleteUser,

@@ -2,7 +2,7 @@ const { Connection, AddressLookupTableAccount, Keypair, TransactionInstruction, 
 const bs58 = require('bs58');
 const {createWebhookUser, createWebhookAdmin, getWebhooks, editWebhookUser, editWebhookAdmin} = require('../config/webhook');
 const dotenv = require('dotenv');
-const { AccountLayout, createAssociatedTokenAccountInstruction, createTransferInstruction} = require('@solana/spl-token');
+const { AccountLayout, createAssociatedTokenAccountInstruction, createTransferInstruction, getAssociatedTokenAddressSync} = require('@solana/spl-token');
 const axios = require('axios');
 
 const WEBHOOK_ID = require('../config/constants');
@@ -18,7 +18,7 @@ const deserializeTransaction = (swapTransaction) => {
         const transactionBuffer = Buffer.from(swapTransaction, 'base64');
         return VersionedTransaction.deserialize(transactionBuffer).message;
     } catch (err){
-        throw new Error("Error in deserializing transaction", err);
+        throw new Error("Error in deserializing transaction");
     }
 }
 
@@ -77,7 +77,6 @@ const createVersionedTransaction = async (payer, instructions, latestBlockhash) 
 
 const checkTokenAccountExistence = async (associatedTokenAccount) => {
     const accountInfo = await connection.getAccountInfo(associatedTokenAccount);
-  
     if (accountInfo) {
       return true;
     } else {
@@ -105,6 +104,7 @@ const getTokenBalance = async (associatedTokenAccount) => {
 }
 
 const sendBundleRequest = async (serializedTransactions) => {
+    console.log(JITO_ENDPOINTS);
     const request = JITO_ENDPOINTS.map(async (url) => 
         await axios.post(url, 
             {
@@ -124,7 +124,6 @@ const sendBundleRequest = async (serializedTransactions) => {
     console.log('Jito: Sending transactions to endpoints...');
     
     const results = await Promise.all(request.map((result) => result.catch((e) => e)));
-
     const successfulResults = results.filter((result) => !(result instanceof Error));
 
     if (successfulResults.length > 0) {
@@ -140,9 +139,10 @@ const checkTransactionStatus = async (signatures) => {
     try {
         console.log('Confirming transaction....');
         const confirmation = await connection.getSignatureStatus(signatures, {searchTransactionHistory: true});
-        return { confirmed: !confirmation.value.err, err: confirmation.value.err };
+        if(!confirmation.value.err) return true;
+        else return false;
     } catch (error) {
-        return { confirmed: false, err: error };
+        return false;
     }
 }
 
@@ -172,7 +172,7 @@ const delay =  (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const checkWebhooks = async () => {
+const checkWebhooks = async () => { 
     const webhooks = await getWebhooks();
     if (webhooks == 'failed'){
         console.log('Webhooks fetching error');
@@ -182,7 +182,7 @@ const checkWebhooks = async () => {
         await createWebhookAdmin();
     }
     else if (Array.isArray(webhooks)){
-        let webhookFlags;
+        let webhookFlags = 0;
         // console.log(WEBHOOK_ID.getUserWebHookID(), WEBHOOK_ID.getAdminWebhookID());
         for (const webhook of webhooks){
             if (webhook.webhookID == WEBHOOK_ID.getUserWebHookID() ){
@@ -203,7 +203,7 @@ const checkWebhooks = async () => {
 
 const fetchTokenListFromBirdeye = async (offset) => {
     try {
-        const apiKey = '14d4adcd88284ab29a2f80c8481c202d';
+        const apiKey = process.env.BIRDEYE_API_KEY || '14d4adcd88284ab29a2f80c8481c202d';
         const res = await axios.get(`https://public-api.birdeye.so/defi/tokenlist?sort_by=v24hUSD&sort_type=desc&offset=${offset}&min_liquidity=10000`,{
             headers: {
                 "X-API-KEY": apiKey,
@@ -279,28 +279,29 @@ const getSwapQuoteFromJup = async (inputMint, outputMint, inputAmount, slippageB
         const swapRequestBody = {
             quoteResponse: quoteData,
             userPublicKey: walletAddress,
-            // dynamicComputeUnitLimit: true,
+            dynamicComputeUnitLimit: true,
             prioritizationFeeLamports: {
-                jitoTipLamports: 0.001 * LAMPORTS_PER_SOL
+                jitoTipLamports: 0.0001 * LAMPORTS_PER_SOL
             },
         };
         return { swapRequestBody, outAmount };
 }
-const getSwapTransactionFromJup = async ( quoteResponse ) => {
-    try {
-        const swapResponse = await axios.post(`https://api.jup.ag/swap/v1/swap`, quoteResponse);
+
+// const getSwapTransactionFromJup = async ( quoteResponse ) => {
+//     try {
+//         const swapResponse = await axios.post(`https://api.jup.ag/swap/v1/swap`, quoteResponse);
             
-        if ( swapResponse.error){
-            throw new Error('Failed to get swap instructions:', swapResponse.error);
-        }
+//         if ( swapResponse.error){
+//             throw new Error('Failed to get swap instructions:', swapResponse.error);
+//         }
 
-        const swapData = swapResponse.data
+//         const swapData = swapResponse.data
 
-        return swapData.swapTransaction
-    } catch (err){
-        throw new Error("Failed to get swap Instruction", err);
-    }
-}
+//         return swapData.swapTransaction
+//     } catch (err){
+//         throw new Error("Failed to get swap Instruction", err);
+//     }
+// }
 
 const getSwapInstructionFromJup = async (quoteResponse, signers) => {
     try {
@@ -309,16 +310,16 @@ const getSwapInstructionFromJup = async (quoteResponse, signers) => {
         if (instructions.error) {
             throw new Error("Failed to get swap instructions: " + instructions.error);
         }
-        
         const {
             tokenLedgerInstruction, // If you are using `useTokenLedger = true`.
             computeBudgetInstructions, // The necessary instructions to setup the compute budget.
             setupInstructions, // Setup missing ATA for the users.
             swapInstruction: swapInstructionPayload, // The actual swap instruction.
             cleanupInstruction, // Unwrap the SOL if `wrapAndUnwrapSol = true`.
-            addressLookupTableAddresses, // The lookup table addresses that you can use if you are using versioned transaction.
+            addressLookupTableAddresses,// The lookup table addresses that you can use if you are using versioned transaction.
+            otherInstructions,
         } = instructions.data;
-        console.log(instructions.data);
+        // console.log('INSTRUCTUcTIONS:', instructions.data);
         const deserializeInstruction = (instruction) => {
             return new TransactionInstruction({ 
             programId: new PublicKey(instruction.programId),
@@ -362,28 +363,34 @@ const getSwapInstructionFromJup = async (quoteResponse, signers) => {
             payerKey: signers[0].publicKey,
             recentBlockhash: blockhash,
             instructions: [
-            // uncomment if needed: ...setupInstructions.map(deserializeInstruction),
+                ...computeBudgetInstructions.map(deserializeInstruction),
+                ...setupInstructions.map(deserializeInstruction),
                 deserializeInstruction(swapInstructionPayload),
-            // uncomment if needed: deserializeInstruction(cleanupInstruction),
+                deserializeInstruction(cleanupInstruction),
+                ...otherInstructions.map(deserializeInstruction),
             ],
         }).compileToV0Message(addressLookupTableAccounts);
         const transaction = new VersionedTransaction(messageV0);
-        transaction.sign([adminWallet]);
-        return bs58.encode(transaction.signatures[0]);
+        transaction.sign(signers);
+        console.log("HASH", bs58.encode(transaction.signatures[0]));
+        const txBinary = bs58.encode(transaction.serialize());
+        const txSignature = bs58.encode(transaction.signatures[0])
+        return {txBinary, txSignature};
     } catch (err){
-        throw new Error("Failed to get swap instruction", err);
+        console.log(err);
+        // throw new Error("Failed to get swap instruction", err);
     }
 }
 
 const tokenSwap = async (walletAddress, inputMint, outputMint, inputAmount, slippageBps, signers) => {
     try{
         const {swapRequestBody, outAmount} = await getSwapQuoteFromJup(inputMint, outputMint, inputAmount, slippageBps, walletAddress);
-        const swapTxHash = await getSwapInstructionFromJup (swapRequestBody, signers);
-        console.log(swapTxHash);
-        const isSent = await sendBundleRequest(swapTxHash);
-        return {isSent, swapTxHash, outAmount};
+        const swapInsResult = await getSwapInstructionFromJup (swapRequestBody, signers);
+        const isSent = await sendBundleRequest([swapInsResult.txBinary]);
+        return {isSent, swapTxHash: swapInsResult.txSignature, outAmount};
     } catch (error){
-        throw new Error("Error in token swap", err);
+        console.log(error);
+        throw new Error("Error in token swap", error.message);
     }
 }
 
@@ -395,7 +402,7 @@ const tokenTransfer = async (senderWallet, receiverAddress, tokenMint, amount, s
         ]);
         const instructions = [];
         if(!(await checkTokenAccountExistence(receiverATA))) {
-            instructions.push( createAssociatedTokenAccountInstruction( signers[0].publicKey, receiverATA, new PublicKey(receiverAddress), new PublicKey(mint)));
+            instructions.push( createAssociatedTokenAccountInstruction( signers[0].publicKey, receiverATA, new PublicKey(receiverAddress), new PublicKey(tokenMint)));
         }
         const [ tokenBalance, latestBlockhash ] = await Promise.all([
             getTokenBalance(senderATA),
@@ -421,6 +428,36 @@ const tokenTransfer = async (senderWallet, receiverAddress, tokenMint, amount, s
     }
 }
 
+const solTransfer = async (senderWallet, receiverAddress, amount, signers) => {
+    let userBalance = await connection.getBalance(senderWallet.publicKey);
+    console.log(`Sol Balance ${amount / LAMPORTS_PER_SOL} ${senderWallet.publicKey.toBase58()}`);
+    let retrying = 0
+    while (userBalance == 0){
+        await delay(1000);
+        retrying ++;
+        userBalance = await connection.getBalance(senderWallet.publicKey);
+        if(retrying > 10 && userBalance < amount){
+            console.log("Not enough assets in user wallet");
+            return;
+        }
+    }
+    const instructions = [];
+    instructions.push(
+        SystemProgram.transfer({
+            fromPubkey: senderWallet.publicKey,
+            toPubkey: new PublicKey(receiverAddress),
+            lamports: userBalance
+        })
+    );
+
+    const latestBlockhash = await connection.getLatestBlockhash();
+    const signersArray = (senderWallet in signers) ? signers: [...signers, senderWallet]
+    const versionedTransaction = await createVersionedTransaction(signersArray, instructions, latestBlockhash);
+    const tx_id = await connection.sendRawTransaction(versionedTransaction.serialize(), signers);
+    console.log('Forwarding asset to admin wallet...');
+    return tx_id;
+}
+
 module.exports = {
     connection, 
     adminWallet,
@@ -439,8 +476,9 @@ module.exports = {
     checkLiquidity,
     fetchTokenMetaData,
     getSwapQuoteFromJup,
-    getSwapTransactionFromJup,
+    // getSwapTransactionFromJup,
     tokenSwap,
     getSwapInstructionFromJup,
-    tokenTransfer    
+    tokenTransfer,
+    solTransfer    
 }
